@@ -183,6 +183,11 @@ const UploadPage = () => {
 
           if (data.items && data.items.length > 0) {
             allItems.push(...data.items);
+            toast.success(`✓ Found ${data.items.length} items in image ${i + 1}`, { 
+              duration: 2000 
+            });
+          } else {
+            toast.info(`No items found in image ${i + 1}`, { duration: 1500 });
           }
         } catch (imageError) {
           console.error(`Error processing image ${i + 1}:`, imageError);
@@ -199,7 +204,7 @@ const UploadPage = () => {
           volume: item.volume,
           weight: item.weight,
           found_in_image: item.found_in_image || null,
-          notes: item.notes,
+          room: item.room,
           ai_generated: true
         }));
 
@@ -207,7 +212,10 @@ const UploadPage = () => {
           .from('inventory_items')
           .insert(itemsToInsert);
 
-        if (itemsError) throw itemsError;
+        if (itemsError) {
+          console.error('Database insertion error:', itemsError);
+          throw new Error(`Failed to save items to database: ${itemsError.message}`);
+        }
 
         // Get existing items to calculate totals correctly
         const { data: existingItems, error: fetchError } = await supabase
