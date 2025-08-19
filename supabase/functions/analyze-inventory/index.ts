@@ -142,27 +142,49 @@ List only items you are confident need to be moved:`
     // Parse the JSON response from OpenAI
     let inventoryItems;
     try {
-      // Clean the response in case it has markdown formatting
-      const cleanContent = analysisContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-      console.log('Attempting to parse JSON:', cleanContent.substring(0, 200) + '...');
-      inventoryItems = JSON.parse(cleanContent);
+      console.log('Raw OpenAI content:', analysisContent.substring(0, 500) + '...');
+      
+      // First, try to extract JSON from markdown code blocks
+      const jsonBlockMatch = analysisContent.match(/```json\s*(\[[\s\S]*?\])\s*```/);
+      let jsonContent = '';
+      
+      if (jsonBlockMatch) {
+        jsonContent = jsonBlockMatch[1];
+        console.log('Extracted JSON from markdown block');
+      } else {
+        // Fallback: try to find JSON array in the content
+        const jsonArrayMatch = analysisContent.match(/(\[[\s\S]*?\])/);
+        if (jsonArrayMatch) {
+          // Find the end of the JSON array by counting brackets
+          const startIndex = analysisContent.indexOf('[');
+          let bracketCount = 0;
+          let endIndex = startIndex;
+          
+          for (let i = startIndex; i < analysisContent.length; i++) {
+            const char = analysisContent[i];
+            if (char === '[') bracketCount++;
+            if (char === ']') bracketCount--;
+            if (bracketCount === 0) {
+              endIndex = i;
+              break;
+            }
+          }
+          
+          jsonContent = analysisContent.substring(startIndex, endIndex + 1);
+          console.log('Extracted JSON array using bracket counting');
+        } else {
+          throw new Error('No JSON array found in response');
+        }
+      }
+      
+      console.log('Attempting to parse JSON:', jsonContent.substring(0, 300) + '...');
+      inventoryItems = JSON.parse(jsonContent);
+      console.log('Successfully parsed JSON, found', inventoryItems.length, 'items');
+      
     } catch (parseError) {
       console.error('Error parsing OpenAI response:', parseError);
       console.error('Raw content:', analysisContent);
-      
-      // Fallback: try to extract JSON from the response
-      const jsonMatch = analysisContent.match(/\[[\s\S]*\]/);
-      if (jsonMatch) {
-        try {
-          inventoryItems = JSON.parse(jsonMatch[0]);
-          console.log('Successfully parsed JSON from regex match');
-        } catch (regexParseError) {
-          console.error('Regex parse also failed:', regexParseError);
-          throw new Error('Failed to parse AI analysis results');
-        }
-      } else {
-        throw new Error('No valid JSON found in AI response');
-      }
+      throw new Error(`Failed to parse AI analysis results: ${parseError.message}`);
     }
 
     if (!Array.isArray(inventoryItems)) {
