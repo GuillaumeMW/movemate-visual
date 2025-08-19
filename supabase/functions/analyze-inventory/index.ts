@@ -24,28 +24,25 @@ serve(async (req) => {
     const body = await req.json();
     console.log('Request body received, keys:', Object.keys(body));
     
-    const { images } = body;
+    const { image, imageNumber } = body;
     
-    if (!images || !Array.isArray(images) || images.length === 0) {
-      console.error('No images provided or images is not an array');
-      throw new Error('Images array is required');
+    if (!image || typeof image !== 'string') {
+      console.error('No image provided or image is not a string');
+      throw new Error('Image is required');
     }
     
-    console.log('Processing', images.length, 'images');
+    console.log('Processing single image, number:', imageNumber);
     
-    const systemPrompt = 'Please make an inventory of items to be moved and estimate a move volume in cu ft based on the pictures provided. Make sure to only count each item once even if shown on more than one picture. Regroup similar items, for example (4 wooden dinning chairs). For miscellaneous items or items that can be boxed, estimate a box count. You can use small, medium or large size boxes. For each item, mention on which photo you found it for easy tracking. IMPORTANT: The photos are numbered sequentially starting from 1 (first photo = 1, second photo = 2, third photo = 3, etc.). Return a JSON array where each item has: name (string), quantity (number), volume (number in cu ft), weight (number in lbs), found_in_image (number indicating which photo, starting from 1).';
+    const systemPrompt = 'Please make an inventory of items to be moved and estimate a move volume in cu ft based on this single photo. For each item you identify, provide the following: name (string), quantity (number), volume (number in cu ft), weight (number in lbs). Return a JSON array where each item has these properties. Be thorough but avoid duplicating items that might appear in multiple photos of the same room.';
 
-    // Prepare messages with images - limit image size for API
-    const processedImages = images.map((image: string) => {
-      // Ensure the image is a proper data URL
-      if (!image.startsWith('data:image/')) {
-        console.warn('Image does not start with data:image/, adding prefix');
-        return `data:image/jpeg;base64,${image}`;
-      }
-      return image;
-    });
+    // Prepare the image - ensure it's a proper data URL
+    let processedImage = image;
+    if (!image.startsWith('data:image/')) {
+      console.warn('Image does not start with data:image/, adding prefix');
+      processedImage = `data:image/jpeg;base64,${image}`;
+    }
 
-    console.log('Prepared', processedImages.length, 'images for OpenAI API');
+    console.log('Prepared single image for OpenAI API');
 
     const messages = [
       { role: 'system', content: systemPrompt },
@@ -54,20 +51,20 @@ serve(async (req) => {
         content: [
           {
             type: 'text',
-            text: `Please analyze these ${processedImages.length} photos and create an inventory for moving. The photos are numbered as follows: ${processedImages.map((_, index) => `Photo ${index + 1}`).join(', ')}. When referencing items, use the exact photo number (1, 2, 3, etc.):`
+            text: 'Please analyze this photo and create an inventory for moving. List all items you can identify with their estimated volume and weight:'
           },
-          ...processedImages.slice(0, 5).map((image: string, index: number) => ({  // Limit to 5 images max
+          {
             type: 'image_url',
             image_url: {
-              url: image,
-              detail: 'low' // Use low detail to reduce API costs and avoid timeouts
+              url: processedImage,
+              detail: 'high' // Use high detail for single image analysis
             }
-          }))
+          }
         ]
       }
     ];
 
-    console.log('Making OpenAI API call with', messages[1].content.length - 1, 'images');
+    console.log('Making OpenAI API call with single image');
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -132,18 +129,19 @@ serve(async (req) => {
       throw new Error('AI response is not a valid array');
     }
 
-    // Add IDs to the items
+    // Add IDs and image number to the items
     const itemsWithIds = inventoryItems.map((item: any, index: number) => ({
-      id: `item_${index + 1}`,
+      id: `item_${imageNumber}_${index + 1}`,
+      found_in_image: imageNumber,
       ...item
     }));
 
-    console.log('AI Analysis completed for', images.length, 'images, found', itemsWithIds.length, 'items');
+    console.log('AI Analysis completed for image', imageNumber, ', found', itemsWithIds.length, 'items');
 
     return new Response(JSON.stringify({ 
       items: itemsWithIds,
       itemCount: itemsWithIds.length,
-      imageCount: images.length
+      imageNumber: imageNumber
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

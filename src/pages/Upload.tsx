@@ -19,6 +19,7 @@ const UploadPage = () => {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisProgress, setAnalysisProgress] = useState({ current: 0, total: 0 });
   const [currentSession, setCurrentSession] = useState<any>(null);
   const [searchParams] = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -147,24 +148,49 @@ const UploadPage = () => {
 
       const uploadedFiles = await Promise.all(uploadPromises);
       
-      // Convert files to base64 for AI analysis
-      const imagePromises = files.map(file => convertFileToBase64(file.file));
-      const base64Images = await Promise.all(imagePromises);
+      // Process images one by one with progress tracking
+      setAnalysisProgress({ current: 0, total: files.length });
+      let allItems: any[] = [];
       
-      toast.info("Analyzing photos with AI...", { duration: 2000 });
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        setAnalysisProgress({ current: i + 1, total: files.length });
+        
+        toast.info(`Analyzing image ${i + 1} of ${files.length}...`, { 
+          duration: 1000,
+          id: 'analysis-progress'
+        });
 
-      // Call the analyze-inventory edge function
-      const { data, error } = await supabase.functions.invoke('analyze-inventory', {
-        body: { 
-          images: base64Images
+        try {
+          // Convert file to base64
+          const base64Image = await convertFileToBase64(file.file);
+          
+          // Call the analyze-inventory edge function for single image
+          const { data, error } = await supabase.functions.invoke('analyze-inventory', {
+            body: { 
+              image: base64Image,
+              imageNumber: i + 1
+            }
+          });
+
+          if (error) {
+            console.error(`Error analyzing image ${i + 1}:`, error);
+            toast.error(`Failed to analyze image ${i + 1}`);
+            continue;
+          }
+
+          if (data.items && data.items.length > 0) {
+            allItems.push(...data.items);
+          }
+        } catch (imageError) {
+          console.error(`Error processing image ${i + 1}:`, imageError);
+          toast.error(`Failed to process image ${i + 1}`);
         }
-      });
+      }
 
-      if (error) throw error;
-
-      if (data.items && data.items.length > 0) {
-        // Save analysis results to database
-        const itemsToInsert = data.items.map((item: any) => ({
+      if (allItems.length > 0) {
+        // Save all analysis results to database
+        const itemsToInsert = allItems.map((item: any) => ({
           session_id: session.id,
           name: item.name,
           quantity: item.quantity,
@@ -201,7 +227,7 @@ const UploadPage = () => {
           })
           .eq('id', session.id);
         
-        toast.success(`Analyzed ${files.length} photos and found ${data.items.length} items!`);
+        toast.success(`Analyzed ${files.length} photos and found ${allItems.length} items!`);
         navigate(`/review?session=${session.id}`);
       } else {
         toast.error("No items were detected in the photos. Please try different images.");
@@ -211,6 +237,7 @@ const UploadPage = () => {
       toast.error('Failed to analyze photos. Please try again.');
     } finally {
       setIsAnalyzing(false);
+      setAnalysisProgress({ current: 0, total: 0 });
     }
   };
 
@@ -360,7 +387,10 @@ const UploadPage = () => {
               {isAnalyzing ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Analyzing...
+                  {analysisProgress.total > 0 ? 
+                    `Analyzing ${analysisProgress.current}/${analysisProgress.total}...` : 
+                    'Analyzing...'
+                  }
                 </>
               ) : (
                 `Analyze Items (${files.length} photos)`
