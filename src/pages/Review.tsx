@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Trash2, Edit3, Plus, Save, X } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Trash2, Edit3, Plus, Save, X, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -16,6 +17,13 @@ interface InventoryItem {
   volume: number; // in cu ft
   weight: number; // in lbs
   notes?: string;
+}
+
+interface UploadedImage {
+  id: string;
+  file_name: string;
+  file_path: string;
+  analyzed_at: string;
 }
 
 // Mock data - in real app this would come from AI analysis
@@ -59,6 +67,8 @@ export default function Review() {
   
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [sessionInfo, setSessionInfo] = useState<any>(null);
+  const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // Load inventory items from database
@@ -83,8 +93,8 @@ export default function Review() {
       }
 
       try {
-        // Load session info and items from database
-        const [sessionResult, itemsResult] = await Promise.all([
+        // Load session info, items, and images from database
+        const [sessionResult, itemsResult, imagesResult] = await Promise.all([
           supabase
             .from('inventory_sessions')
             .select('*')
@@ -94,14 +104,21 @@ export default function Review() {
             .from('inventory_items')
             .select('*')
             .eq('session_id', sessionId)
-            .order('created_at', { ascending: true })
+            .order('created_at', { ascending: true }),
+          supabase
+            .from('uploaded_images')
+            .select('*')
+            .eq('session_id', sessionId)
+            .order('analyzed_at', { ascending: true })
         ]);
 
         if (sessionResult.error) throw sessionResult.error;
         if (itemsResult.error) throw itemsResult.error;
+        if (imagesResult.error) throw imagesResult.error;
 
         setSessionInfo(sessionResult.data);
         setItems(itemsResult.data || []);
+        setUploadedImages(imagesResult.data || []);
       } catch (error) {
         console.error('Error loading inventory data:', error);
         toast.error('Failed to load inventory data');
@@ -279,6 +296,13 @@ export default function Review() {
     } catch (error) {
       console.error('Error updating session totals:', error);
     }
+  };
+
+  const getImageUrl = (filePath: string) => {
+    const { data } = supabase.storage
+      .from('inventory-images')
+      .getPublicUrl(filePath);
+    return data.publicUrl;
   };
 
 
@@ -577,6 +601,59 @@ export default function Review() {
           </Card>
         )}
 
+        {/* Uploaded Photos Section */}
+        {uploadedImages.length > 0 && (
+          <Card className="mb-8">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ImageIcon className="h-5 w-5" />
+                Uploaded Photos ({uploadedImages.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                {uploadedImages.map((image) => (
+                  <div
+                    key={image.id}
+                    className="relative group cursor-pointer"
+                    onClick={() => setSelectedImage(getImageUrl(image.file_path))}
+                  >
+                    <img
+                      src={getImageUrl(image.file_path)}
+                      alt={image.file_name}
+                      className="w-full h-24 object-cover rounded-lg border hover:border-primary transition-colors"
+                    />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors rounded-lg flex items-center justify-center">
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="bg-white/90 p-1 rounded text-xs font-medium">
+                          Click to view
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Image Preview Dialog */}
+        <Dialog open={selectedImage !== null} onOpenChange={() => setSelectedImage(null)}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
+            <DialogHeader>
+              <DialogTitle>Photo Preview</DialogTitle>
+            </DialogHeader>
+            {selectedImage && (
+              <div className="flex items-center justify-center p-4">
+                <img
+                  src={selectedImage}
+                  alt="Selected photo"
+                  className="max-w-full max-h-[70vh] object-contain rounded-lg"
+                />
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
 
         {/* Navigation */}
         <div className="flex justify-between">
