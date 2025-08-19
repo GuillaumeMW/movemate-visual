@@ -18,6 +18,7 @@ export type Database = {
         Row: {
           ai_generated: boolean | null
           created_at: string
+          found_in_image: number | null
           id: string
           name: string
           notes: string | null
@@ -30,6 +31,7 @@ export type Database = {
         Insert: {
           ai_generated?: boolean | null
           created_at?: string
+          found_in_image?: number | null
           id?: string
           name: string
           notes?: string | null
@@ -42,6 +44,7 @@ export type Database = {
         Update: {
           ai_generated?: boolean | null
           created_at?: string
+          found_in_image?: number | null
           id?: string
           name?: string
           notes?: string | null

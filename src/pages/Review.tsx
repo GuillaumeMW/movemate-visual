@@ -16,6 +16,7 @@ interface InventoryItem {
   quantity: number;
   volume: number; // in cu ft
   weight: number; // in lbs
+  found_in_image?: number; // which photo the item was found in
   notes?: string;
 }
 
@@ -472,9 +473,9 @@ export default function Review() {
                          </div>
                        </td>
                        <td className="p-4">
-                         <Badge variant="outline" className="text-xs">
-                           #{Math.floor(Math.random() * uploadedImages.length) + 1 || 1}
-                         </Badge>
+                          <Badge variant="outline" className="text-xs">
+                            #{item.found_in_image || 'N/A'}
+                          </Badge>
                        </td>
                       <td className="p-4">
                         <Input

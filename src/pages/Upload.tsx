@@ -170,6 +170,7 @@ const UploadPage = () => {
           quantity: item.quantity,
           volume: item.volume,
           weight: item.weight,
+          found_in_image: item.found_in_image || null,
           notes: item.notes,
           ai_generated: true
         }));
