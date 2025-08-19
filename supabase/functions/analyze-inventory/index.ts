@@ -33,7 +33,7 @@ serve(async (req) => {
     
     console.log('Processing', images.length, 'images');
     
-    const systemPrompt = 'Please make an inventory of items to be moved and estimate a move volume in cu ft based on the pictures provided. Make sure to only count each item once even if shown on more than one picture. Regroup similar items, for example (4 wooden dinning chairs). For miscellaneous items or items that can be boxed, estimate a box count. You can use small, medium or large size boxes. For each item, mention on which photo you found it for easy tracking (use photo numbers 1, 2, 3, etc.). Return a JSON array where each item has: name (string), quantity (number), volume (number in cu ft), weight (number in lbs), found_in_image (number indicating which photo, starting from 1).';
+    const systemPrompt = 'Please make an inventory of items to be moved and estimate a move volume in cu ft based on the pictures provided. Make sure to only count each item once even if shown on more than one picture. Regroup similar items, for example (4 wooden dinning chairs). For miscellaneous items or items that can be boxed, estimate a box count. You can use small, medium or large size boxes. For each item, mention on which photo you found it for easy tracking. IMPORTANT: The photos are numbered sequentially starting from 1 (first photo = 1, second photo = 2, third photo = 3, etc.). Return a JSON array where each item has: name (string), quantity (number), volume (number in cu ft), weight (number in lbs), found_in_image (number indicating which photo, starting from 1).';
 
     // Prepare messages with images - limit image size for API
     const processedImages = images.map((image: string) => {
@@ -54,9 +54,9 @@ serve(async (req) => {
         content: [
           {
             type: 'text',
-            text: 'Please analyze these photos and create an inventory for moving:'
+            text: `Please analyze these ${processedImages.length} photos and create an inventory for moving. The photos are numbered as follows: ${processedImages.map((_, index) => `Photo ${index + 1}`).join(', ')}. When referencing items, use the exact photo number (1, 2, 3, etc.):`
           },
-          ...processedImages.slice(0, 5).map((image: string) => ({  // Limit to 5 images max
+          ...processedImages.slice(0, 5).map((image: string, index: number) => ({  // Limit to 5 images max
             type: 'image_url',
             image_url: {
               url: image,
