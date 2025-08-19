@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Trash2, Edit3, Plus, Save, X, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { RoomDropdown } from '@/components/RoomDropdown';
 
 interface InventoryItem {
   id: string;
@@ -17,7 +18,7 @@ interface InventoryItem {
   volume: number; // in cu ft
   weight: number; // in lbs
   found_in_image?: number; // which photo the item was found in
-  notes?: string;
+  room?: string; // room where item is located
   is_going?: boolean; // whether item is being moved
 }
 
@@ -36,6 +37,7 @@ const mockItems: InventoryItem[] = [
     quantity: 1,
     volume: 88.4, // cu ft
     weight: 99, // lbs
+    room: 'Bedroom',
     is_going: true
   },
   {
@@ -44,6 +46,7 @@ const mockItems: InventoryItem[] = [
     quantity: 1,
     volume: 63.5,
     weight: 77,
+    room: 'Dining Room',
     is_going: true
   },
   {
@@ -52,6 +55,7 @@ const mockItems: InventoryItem[] = [
     quantity: 5,
     volume: 2.0,
     weight: 18,
+    room: 'Living Room',
     is_going: true
   },
   {
@@ -60,7 +64,7 @@ const mockItems: InventoryItem[] = [
     quantity: 1,
     volume: 28.3,
     weight: 33,
-    notes: 'Handle with care - fragile electronics',
+    room: 'Living Room',
     is_going: true
   }
 ];
@@ -151,6 +155,7 @@ export default function Review() {
     quantity: 1,
     volume: 0,
     weight: 0,
+    room: '',
     is_going: true
   });
 
@@ -216,7 +221,8 @@ export default function Review() {
         quantity: newItem.quantity || 1,
         volume: newItem.volume || 0,
         weight: newItem.weight || 0,
-        notes: newItem.notes
+        room: newItem.room,
+        is_going: newItem.is_going !== false
       };
 
       if (sessionId) {
@@ -228,7 +234,7 @@ export default function Review() {
             quantity: item.quantity,
             volume: item.volume,
             weight: item.weight,
-            notes: item.notes,
+            room: item.room,
             is_going: item.is_going !== false,
             ai_generated: false
           });
@@ -245,6 +251,7 @@ export default function Review() {
         quantity: 1,
         volume: 0,
         weight: 0,
+        room: '',
         is_going: true
       });
       setShowAddForm(false);
@@ -375,7 +382,7 @@ export default function Review() {
                     <th className="p-4">Quantity</th>
                     <th className="p-4">Volume (cu ft)</th>
                     <th className="p-4">Weight (lbs)</th>
-                    <th className="p-4">Notes</th>
+                    <th className="p-4">Room</th>
                     <th className="p-4">Actions</th>
                   </tr>
                 </thead>
@@ -396,28 +403,23 @@ export default function Review() {
                        <td className="p-4">
                          <div className="flex items-center gap-3">
                            <div>
-                             {editingItem === item.id ? (
-                               <Input
-                                 value={item.name}
-                                 onChange={(e) => updateItem(item.id, { name: e.target.value })}
-                                 className="h-8"
-                                 onBlur={() => setEditingItem(null)}
-                                 onKeyDown={(e) => e.key === 'Enter' && setEditingItem(null)}
-                                 autoFocus
-                               />
-                             ) : (
-                               <div 
-                                 className="font-medium cursor-pointer hover:text-primary"
-                                 onClick={() => setEditingItem(item.id)}
-                               >
-                                 {item.name}
-                               </div>
-                             )}
-                             {item.notes && (
-                               <div className="text-xs text-muted-foreground mt-1">
-                                 {item.notes}
-                               </div>
-                             )}
+                              {editingItem === item.id ? (
+                                <Input
+                                  value={item.name}
+                                  onChange={(e) => updateItem(item.id, { name: e.target.value })}
+                                  className="h-8"
+                                  onBlur={() => setEditingItem(null)}
+                                  onKeyDown={(e) => e.key === 'Enter' && setEditingItem(null)}
+                                  autoFocus
+                                />
+                              ) : (
+                                <div 
+                                  className="font-medium cursor-pointer hover:text-primary"
+                                  onClick={() => setEditingItem(item.id)}
+                                >
+                                  {item.name}
+                                </div>
+                              )}
                            </div>
                          </div>
                        </td>
@@ -454,15 +456,13 @@ export default function Review() {
                           step="0.5"
                           min="0"
                         />
-                      </td>
-                      <td className="p-4">
-                        <Input
-                          value={item.notes || ''}
-                          onChange={(e) => updateItem(item.id, { notes: e.target.value })}
-                          className="h-8 w-32"
-                          placeholder="Add notes..."
-                        />
-                      </td>
+                       </td>
+                       <td className="p-4">
+                         <RoomDropdown
+                           value={item.room}
+                           onValueChange={(room) => updateItem(item.id, { room })}
+                         />
+                       </td>
                       <td className="p-4">
                         <Button
                           variant="ghost"
@@ -497,7 +497,7 @@ export default function Review() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                 <div>
                   <label className="text-sm font-medium mb-2 block">Item Name *</label>
                   <Input
@@ -535,14 +535,13 @@ export default function Review() {
                     min="0"
                   />
                 </div>
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-2 block">Notes (optional)</label>
-                <Input
-                  value={newItem.notes || ''}
-                  onChange={(e) => setNewItem({...newItem, notes: e.target.value})}
-                  placeholder="Additional notes about this item"
-                />
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Room</label>
+                  <RoomDropdown
+                    value={newItem.room}
+                    onValueChange={(room) => setNewItem({...newItem, room})}
+                  />
+                </div>
               </div>
               <div className="flex gap-2">
                 <Button onClick={addNewItem}>

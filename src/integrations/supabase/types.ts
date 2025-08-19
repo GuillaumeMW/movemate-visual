@@ -22,8 +22,8 @@ export type Database = {
           id: string
           is_going: boolean
           name: string
-          notes: string | null
           quantity: number
+          room: string | null
           session_id: string
           updated_at: string
           volume: number
@@ -36,8 +36,8 @@ export type Database = {
           id?: string
           is_going?: boolean
           name: string
-          notes?: string | null
           quantity?: number
+          room?: string | null
           session_id: string
           updated_at?: string
           volume?: number
@@ -50,8 +50,8 @@ export type Database = {
           id?: string
           is_going?: boolean
           name?: string
-          notes?: string | null
           quantity?: number
+          room?: string | null
           session_id?: string
           updated_at?: string
           volume?: number

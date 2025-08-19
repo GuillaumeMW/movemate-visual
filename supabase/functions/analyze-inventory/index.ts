@@ -60,7 +60,7 @@ Items that would normally be moved in boxes should be combined into box estimate
 
 Example: Instead of listing "20 books, 15 CDs, 10 kitchen gadgets" → list "Small Boxes" with quantity 3-4${existingItemsContext}
 
-Return a JSON array where each item has: name (string), quantity (number), volume (number in cu ft), weight (number in lbs).`;
+Return a JSON array where each item has: name (string), quantity (number), volume (number in cu ft), weight (number in lbs), room (string - the room where this item is located based on visual context, e.g., "Living Room", "Kitchen", "Bedroom", "Bathroom", "Office", "Garage", "Basement", "Dining Room", "Closet", "Laundry Room").`;
 
     // Prepare the image - ensure it's a proper data URL
     let processedImage = image;
