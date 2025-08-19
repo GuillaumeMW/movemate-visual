@@ -630,11 +630,11 @@ export default function Review() {
                        alt={image.file_name}
                        className="w-full h-24 object-cover rounded-lg border hover:border-primary transition-colors"
                      />
-                     <div className="absolute top-2 left-2">
-                       <Badge variant="secondary" className="text-xs font-bold bg-white/90 text-black">
-                         #{index + 1}
-                       </Badge>
-                     </div>
+                      <div className="absolute top-2 left-2">
+                        <Badge variant="secondary" className="text-xs font-bold bg-white/90 text-black">
+                          #{image.file_path.split('_')[1] || index + 1}
+                        </Badge>
+                      </div>
                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors rounded-lg flex items-center justify-center">
                        <div className="opacity-0 group-hover:opacity-100 transition-opacity">
                          <div className="bg-white/90 p-1 rounded text-xs font-medium">
