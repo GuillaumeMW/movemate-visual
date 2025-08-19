@@ -44,12 +44,21 @@ serve(async (req) => {
 
 CRITICAL INSTRUCTIONS:
 - Focus on FOREGROUND items that are the main subject of the photo
-- AVOID background items, wall decorations, or built-in fixtures unless they're clearly moveable
+- AVOID background items or built-in fixtures unless they're clearly moveable
 - Be CONSERVATIVE - it's better to miss an item than create duplicates
+- Be mindful of artwork, mirrors hanging on walls, and rugs that would be moved
 - For furniture, only count major pieces (sofas, beds, tables, not small decorative items)
 - For kitchen items, focus on appliances and major cookware, not every dish or utensil
 - Avoid counting items that typically stay with a property (light fixtures, cabinets, countertops)
-- Group similar small items together (e.g., "Books" rather than listing each book)${existingItemsContext}
+
+BOX GROUPING INSTRUCTIONS:
+Items that would normally be moved in boxes should be combined into box estimates:
+- Small Boxes (1.5 cu ft): Books, CDs, DVDs, kitchen gadgets → estimate number of small boxes needed
+- Medium Boxes (3 cu ft): Clothing, towels, decorative items, small appliances → estimate medium boxes
+- Large Boxes (4.5 cu ft): Bedding, linens, larger toys, lampshades → estimate large boxes  
+- Extra-Large Boxes (6 cu ft): Comforters, pillows, sports equipment → estimate extra-large boxes
+
+Example: Instead of listing "20 books, 15 CDs, 10 kitchen gadgets" → list "Small Boxes" with quantity 3-4${existingItemsContext}
 
 Return a JSON array where each item has: name (string), quantity (number), volume (number in cu ft), weight (number in lbs).`;
 
