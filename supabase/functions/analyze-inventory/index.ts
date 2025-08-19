@@ -33,7 +33,18 @@ serve(async (req) => {
     
     console.log('Processing single image, number:', imageNumber);
     
-    const systemPrompt = 'Please make an inventory of items to be moved and estimate a move volume in cu ft based on this single photo. For each item you identify, provide the following: name (string), quantity (number), volume (number in cu ft), weight (number in lbs). Return a JSON array where each item has these properties. Be thorough but avoid duplicating items that might appear in multiple photos of the same room.';
+    const systemPrompt = `You are analyzing photos for a moving inventory. Create a conservative inventory focused on PRIMARY items that are clearly visible and likely to be moved. 
+
+CRITICAL INSTRUCTIONS:
+- Focus on FOREGROUND items that are the main subject of the photo
+- AVOID background items, wall decorations, or built-in fixtures unless they're clearly moveable
+- Be CONSERVATIVE - it's better to miss an item than create duplicates
+- For furniture, only count major pieces (sofas, beds, tables, not small decorative items)
+- For kitchen items, focus on appliances and major cookware, not every dish or utensil
+- Avoid counting items that typically stay with a property (light fixtures, cabinets, countertops)
+- Group similar small items together (e.g., "Books" rather than listing each book)
+
+Return a JSON array where each item has: name (string), quantity (number), volume (number in cu ft), weight (number in lbs).`;
 
     // Prepare the image - ensure it's a proper data URL
     let processedImage = image;
@@ -51,7 +62,21 @@ serve(async (req) => {
         content: [
           {
             type: 'text',
-            text: 'Please analyze this photo and create an inventory for moving. List all items you can identify with their estimated volume and weight:'
+            text: `Please analyze this photo and create a conservative moving inventory focusing only on PRIMARY, moveable items in the FOREGROUND. 
+
+AVOID:
+- Built-in appliances, cabinets, fixtures
+- Background/wall decorations unless clearly removable
+- Small clutter or individual books/dishes (group these)
+- Items that are barely visible or questionable
+
+FOCUS ON:
+- Major furniture pieces
+- Clearly moveable appliances
+- Obvious personal belongings
+- Items that would require boxes or effort to move
+
+List only items you are confident need to be moved:`
           },
           {
             type: 'image_url',
