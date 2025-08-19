@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Trash2, Edit3, Plus, Save, X, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
@@ -18,6 +18,7 @@ interface InventoryItem {
   weight: number; // in lbs
   found_in_image?: number; // which photo the item was found in
   notes?: string;
+  is_going?: boolean; // whether item is being moved
 }
 
 interface UploadedImage {
@@ -35,6 +36,7 @@ const mockItems: InventoryItem[] = [
     quantity: 1,
     volume: 88.4, // cu ft
     weight: 99, // lbs
+    is_going: true
   },
   {
     id: '2',
@@ -42,6 +44,7 @@ const mockItems: InventoryItem[] = [
     quantity: 1,
     volume: 63.5,
     weight: 77,
+    is_going: true
   },
   {
     id: '3',
@@ -49,6 +52,7 @@ const mockItems: InventoryItem[] = [
     quantity: 5,
     volume: 2.0,
     weight: 18,
+    is_going: true
   },
   {
     id: '4',
@@ -56,7 +60,8 @@ const mockItems: InventoryItem[] = [
     quantity: 1,
     volume: 28.3,
     weight: 33,
-    notes: 'Handle with care - fragile electronics'
+    notes: 'Handle with care - fragile electronics',
+    is_going: true
   }
 ];
 
@@ -138,14 +143,15 @@ export default function Review() {
 
     loadInventoryData();
   }, [sessionId]);
-  const [selectedItems, setSelectedItems] = useState<string[]>([]);
+  
   const [editingItem, setEditingItem] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newItem, setNewItem] = useState<Partial<InventoryItem>>({
     name: '',
     quantity: 1,
     volume: 0,
-    weight: 0
+    weight: 0,
+    is_going: true
   });
 
   const totalVolume = items.reduce((sum, item) => sum + (item.volume * item.quantity), 0);
@@ -223,6 +229,7 @@ export default function Review() {
             volume: item.volume,
             weight: item.weight,
             notes: item.notes,
+            is_going: item.is_going !== false,
             ai_generated: false
           });
         
@@ -237,7 +244,8 @@ export default function Review() {
         name: '',
         quantity: 1,
         volume: 0,
-        weight: 0
+        weight: 0,
+        is_going: true
       });
       setShowAddForm(false);
       toast.success('Item added');
@@ -247,37 +255,6 @@ export default function Review() {
     }
   };
 
-  const toggleItemSelection = (id: string) => {
-    setSelectedItems(prev => 
-      prev.includes(id) 
-        ? prev.filter(itemId => itemId !== id)
-        : [...prev, id]
-    );
-  };
-
-  const deleteSelectedItems = async () => {
-    try {
-      if (sessionId) {
-        const { error } = await supabase
-          .from('inventory_items')
-          .delete()
-          .in('id', selectedItems);
-        
-        if (error) throw error;
-        
-        // Update session totals
-        await updateSessionTotals();
-      }
-      
-      setItems(items.filter(item => !selectedItems.includes(item.id)));
-      const deletedCount = selectedItems.length;
-      setSelectedItems([]);
-      toast.success(`${deletedCount} items deleted`);
-    } catch (error) {
-      console.error('Error deleting selected items:', error);
-      toast.error('Failed to delete selected items');
-    }
-  };
 
   // Helper function to update session totals
   const updateSessionTotals = async () => {
@@ -346,35 +323,6 @@ export default function Review() {
           </Card>
         </div>
 
-        {/* Bulk Actions */}
-        {selectedItems.length > 0 && (
-          <Card className="mb-6 border-primary">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">
-                  {selectedItems.length} item(s) selected
-                </span>
-                <div className="flex gap-2">
-                  <Button 
-                    variant="destructive" 
-                    size="sm"
-                    onClick={deleteSelectedItems}
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete Selected
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => setSelectedItems([])}
-                  >
-                    Clear Selection
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         {/* Data Source Info */}
         <Card className="mb-6 border-blue-200 bg-blue-50">
@@ -421,35 +369,29 @@ export default function Review() {
               <table className="w-full">
                 <thead className="border-b">
                   <tr className="text-left">
-                    <th className="p-4 w-12">
-                      <Checkbox
-                        checked={selectedItems.length === items.length}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            setSelectedItems(items.map(item => item.id));
-                          } else {
-                            setSelectedItems([]);
-                          }
-                        }}
-                      />
-                    </th>
-                     <th className="p-4">Item Name</th>
-                     <th className="p-4">Image #</th>
-                     <th className="p-4">Quantity</th>
-                     <th className="p-4">Volume (cu ft)</th>
-                     <th className="p-4">Weight (lbs)</th>
-                     <th className="p-4">Notes</th>
-                     <th className="p-4">Actions</th>
+                    <th className="p-4 w-20">Going</th>
+                    <th className="p-4">Item Name</th>
+                    <th className="p-4">Image #</th>
+                    <th className="p-4">Quantity</th>
+                    <th className="p-4">Volume (cu ft)</th>
+                    <th className="p-4">Weight (lbs)</th>
+                    <th className="p-4">Notes</th>
+                    <th className="p-4">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {items.map((item) => (
                     <tr key={item.id} className="border-b hover:bg-muted/50">
                       <td className="p-4">
-                        <Checkbox
-                          checked={selectedItems.includes(item.id)}
-                          onCheckedChange={() => toggleItemSelection(item.id)}
-                        />
+                        <div className="flex flex-col items-center gap-1">
+                          <Switch
+                            checked={item.is_going !== false}
+                            onCheckedChange={(checked) => updateItem(item.id, { is_going: checked })}
+                          />
+                          <span className="text-xs text-muted-foreground">
+                            {item.is_going !== false ? 'Going' : 'Not going'}
+                          </span>
+                        </div>
                       </td>
                        <td className="p-4">
                          <div className="flex items-center gap-3">
