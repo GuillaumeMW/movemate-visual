@@ -18,22 +18,30 @@ serve(async (req) => {
       throw new Error('OPENAI_API_KEY is not set');
     }
 
-    const { items, analysisType } = await req.json();
+    const { images } = await req.json();
     
-    let systemPrompt = '';
-    switch (analysisType) {
-      case 'value':
-        systemPrompt = 'You are an expert appraiser. Analyze these inventory items and provide estimated values, condition assessments, and market insights. Return a JSON object with insights for each item.';
-        break;
-      case 'categorize':
-        systemPrompt = 'You are an inventory specialist. Categorize these items into logical groups and suggest optimal organization. Return a JSON object with categories and recommendations.';
-        break;
-      case 'insights':
-        systemPrompt = 'You are a business analyst. Analyze this inventory data and provide actionable insights about trends, opportunities, and recommendations. Return a JSON object with detailed analysis.';
-        break;
-      default:
-        systemPrompt = 'You are an inventory expert. Analyze these items and provide helpful insights.';
-    }
+    const systemPrompt = 'Please make an inventory of items to be moved and estimate a move volume in cu ft based on the pictures provided. Make sure to only count each item once even if shown on more than one picture. Regroup similar items, for example (4 wooden dinning chairs). For miscellaneous items or items that can be boxed, estimate a box count. You can use small, medium or large size boxes. Return a JSON array where each item has: name (string), quantity (number), volume (number in cu ft), weight (number in lbs).';
+
+    // Prepare messages with images
+    const messages = [
+      { role: 'system', content: systemPrompt },
+      { 
+        role: 'user', 
+        content: [
+          {
+            type: 'text',
+            text: 'Please analyze these photos and create an inventory for moving:'
+          },
+          ...images.map((image: string) => ({
+            type: 'image_url',
+            image_url: {
+              url: image,
+              detail: 'high'
+            }
+          }))
+        ]
+      }
+    ];
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -43,15 +51,8 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         model: 'gpt-4.1-2025-04-14',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { 
-            role: 'user', 
-            content: `Analyze these inventory items: ${JSON.stringify(items, null, 2)}` 
-          }
-        ],
-        max_tokens: 1500,
-        temperature: 0.7,
+        messages,
+        max_completion_tokens: 2000,
       }),
     });
 
@@ -60,14 +61,31 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    const analysis = data.choices[0].message.content;
+    const analysisContent = data.choices[0].message.content;
 
-    console.log('AI Analysis completed for', items.length, 'items');
+    // Parse the JSON response from OpenAI
+    let inventoryItems;
+    try {
+      // Clean the response in case it has markdown formatting
+      const cleanContent = analysisContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      inventoryItems = JSON.parse(cleanContent);
+    } catch (parseError) {
+      console.error('Error parsing OpenAI response:', parseError);
+      throw new Error('Failed to parse AI analysis results');
+    }
+
+    // Add IDs to the items
+    const itemsWithIds = inventoryItems.map((item: any, index: number) => ({
+      id: `item_${index + 1}`,
+      ...item
+    }));
+
+    console.log('AI Analysis completed for', images.length, 'images, found', itemsWithIds.length, 'items');
 
     return new Response(JSON.stringify({ 
-      analysis,
-      itemCount: items.length,
-      analysisType 
+      items: itemsWithIds,
+      itemCount: itemsWithIds.length,
+      imageCount: images.length
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

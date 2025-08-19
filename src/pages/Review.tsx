@@ -3,23 +3,17 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Trash2, Edit3, Plus, Save, X, Brain, Loader2 } from 'lucide-react';
+import { Trash2, Edit3, Plus, Save, X } from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
 
 interface InventoryItem {
   id: string;
-  label: string;
-  category: string;
-  room: string;
+  name: string;
   quantity: number;
-  estimatedVolume: number;
-  estimatedWeight: number;
-  confidence: 'high' | 'medium' | 'low';
-  thumbnail?: string;
+  volume: number; // in cu ft
+  weight: number; // in lbs
   notes?: string;
 }
 
@@ -27,52 +21,35 @@ interface InventoryItem {
 const mockItems: InventoryItem[] = [
   {
     id: '1',
-    label: 'Queen Size Bed',
-    category: 'Furniture',
-    room: 'Bedroom',
+    name: 'Queen Size Bed',
     quantity: 1,
-    estimatedVolume: 2.5,
-    estimatedWeight: 45,
-    confidence: 'high',
-    thumbnail: '/placeholder.svg'
+    volume: 88.4, // cu ft
+    weight: 99, // lbs
   },
   {
     id: '2',
-    label: 'Dining Table',
-    category: 'Furniture',
-    room: 'Dining Room',
+    name: 'Dining Table',
     quantity: 1,
-    estimatedVolume: 1.8,
-    estimatedWeight: 35,
-    confidence: 'high',
-    thumbnail: '/placeholder.svg'
+    volume: 63.5,
+    weight: 77,
   },
   {
     id: '3',
-    label: 'Cardboard Box (Medium)',
-    category: 'Boxes',
-    room: 'Living Room',
+    name: 'Medium Boxes',
     quantity: 5,
-    estimatedVolume: 0.5,
-    estimatedWeight: 8,
-    confidence: 'medium',
-    thumbnail: '/placeholder.svg'
+    volume: 2.0,
+    weight: 18,
   },
   {
     id: '4',
-    label: 'Television',
-    category: 'Electronics',
-    room: 'Living Room',
+    name: 'Television (55 inch)',
     quantity: 1,
-    estimatedVolume: 0.8,
-    estimatedWeight: 15,
-    confidence: 'low',
-    notes: 'Unable to determine exact size from image'
+    volume: 28.3,
+    weight: 33,
+    notes: 'Handle with care - fragile electronics'
   }
 ];
 
-const categories = ['Furniture', 'Electronics', 'Boxes', 'Appliances', 'Clothing', 'Books', 'Decor', 'Other'];
-const rooms = ['Living Room', 'Bedroom', 'Kitchen', 'Dining Room', 'Bathroom', 'Office', 'Garage', 'Storage'];
 
 export default function Review() {
   const navigate = useNavigate();
@@ -82,9 +59,17 @@ export default function Review() {
     const storedData = localStorage.getItem('inventoryAnalysis');
     if (storedData) {
       try {
-        return JSON.parse(storedData);
+        const parsed = JSON.parse(storedData);
+        // Check if the data has the new structure (name, volume, weight instead of label, estimatedVolume, estimatedWeight)
+        if (parsed.length > 0 && parsed[0].name && typeof parsed[0].volume === 'number') {
+          return parsed;
+        } else {
+          // Clear old data format
+          localStorage.removeItem('inventoryAnalysis');
+        }
       } catch (error) {
         console.error('Error parsing stored inventory data:', error);
+        localStorage.removeItem('inventoryAnalysis');
       }
     }
     return mockItems; // Fallback to mock data
@@ -95,19 +80,14 @@ export default function Review() {
   const [editingItem, setEditingItem] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newItem, setNewItem] = useState<Partial<InventoryItem>>({
-    label: '',
-    category: '',
-    room: '',
+    name: '',
     quantity: 1,
-    estimatedVolume: 0,
-    estimatedWeight: 0,
-    confidence: 'medium'
+    volume: 0,
+    weight: 0
   });
-  const [aiAnalysis, setAiAnalysis] = useState<string>('');
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  const totalVolume = items.reduce((sum, item) => sum + (item.estimatedVolume * item.quantity), 0);
-  const totalWeight = items.reduce((sum, item) => sum + (item.estimatedWeight * item.quantity), 0);
+  const totalVolume = items.reduce((sum, item) => sum + (item.volume * item.quantity), 0);
+  const totalWeight = items.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
 
   const updateItem = (id: string, updates: Partial<InventoryItem>) => {
@@ -122,32 +102,26 @@ export default function Review() {
   };
 
   const addNewItem = () => {
-    if (!newItem.label || !newItem.category || !newItem.room) {
-      toast.error('Please fill in all required fields');
+    if (!newItem.name) {
+      toast.error('Please enter an item name');
       return;
     }
 
     const item: InventoryItem = {
       id: Date.now().toString(),
-      label: newItem.label!,
-      category: newItem.category!,
-      room: newItem.room!,
+      name: newItem.name!,
       quantity: newItem.quantity || 1,
-      estimatedVolume: newItem.estimatedVolume || 0,
-      estimatedWeight: newItem.estimatedWeight || 0,
-      confidence: 'medium',
+      volume: newItem.volume || 0,
+      weight: newItem.weight || 0,
       notes: newItem.notes
     };
 
     setItems([...items, item]);
     setNewItem({
-      label: '',
-      category: '',
-      room: '',
+      name: '',
       quantity: 1,
-      estimatedVolume: 0,
-      estimatedWeight: 0,
-      confidence: 'medium'
+      volume: 0,
+      weight: 0
     });
     setShowAddForm(false);
     toast.success('Item added');
@@ -167,50 +141,6 @@ export default function Review() {
     toast.success(`${selectedItems.length} items deleted`);
   };
 
-  const getConfidenceColor = (confidence: string) => {
-    switch (confidence) {
-      case 'high': return 'bg-green-100 text-green-800 border-green-200';
-      case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'low': return 'bg-red-100 text-red-800 border-red-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-  };
-
-  const handleAiAnalysis = async (analysisType: 'value' | 'categorize' | 'insights') => {
-    if (items.length === 0) {
-      toast.error('No items to analyze. Please add some inventory items first.');
-      return;
-    }
-
-    setIsAnalyzing(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('analyze-inventory', {
-        body: { 
-          items: items.map(item => ({
-            label: item.label,
-            category: item.category,
-            room: item.room,
-            quantity: item.quantity,
-            estimatedVolume: item.estimatedVolume,
-            estimatedWeight: item.estimatedWeight,
-            confidence: item.confidence,
-            notes: item.notes
-          })),
-          analysisType 
-        }
-      });
-
-      if (error) throw error;
-
-      setAiAnalysis(data.analysis);
-      toast.success(`AI analyzed ${data.itemCount} items for ${analysisType}.`);
-    } catch (error) {
-      console.error('AI Analysis error:', error);
-      toast.error('Failed to analyze inventory. Please try again.');
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -232,14 +162,14 @@ export default function Review() {
           </Card>
           <Card>
             <CardContent className="p-6">
-              <div className="text-2xl font-bold">{totalVolume.toFixed(1)} m³</div>
-              <p className="text-sm text-muted-foreground">Estimated Volume</p>
+              <div className="text-2xl font-bold">{totalVolume.toFixed(1)} cu ft</div>
+              <p className="text-sm text-muted-foreground">Total Volume</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-6">
-              <div className="text-2xl font-bold">{totalWeight.toFixed(0)} kg</div>
-              <p className="text-sm text-muted-foreground">Estimated Weight</p>
+              <div className="text-2xl font-bold">{totalWeight.toFixed(0)} lbs</div>
+              <p className="text-sm text-muted-foreground">Total Weight</p>
             </CardContent>
           </Card>
         </div>
@@ -282,13 +212,11 @@ export default function Review() {
                 <p className="text-sm font-medium text-blue-900">
                   {localStorage.getItem('inventoryAnalysis') 
                     ? `Showing ${items.length} items analyzed from your uploaded photos` 
-                    : `Showing ${items.length} sample items (upload photos to see real analysis)`}
+                    : `Showing ${items.length} sample items (upload photos to analyze real inventory)`}
                 </p>
-                {localStorage.getItem('inventoryAnalysis') && (
-                  <p className="text-xs text-blue-700 mt-1">
-                    You can edit any field below or use AI analysis for insights
-                  </p>
-                )}
+                <p className="text-xs text-blue-700 mt-1">
+                  You can edit quantities, add notes, or add/remove items as needed
+                </p>
               </div>
               {!localStorage.getItem('inventoryAnalysis') && (
                 <Button 
@@ -300,52 +228,6 @@ export default function Review() {
                 </Button>
               )}
             </div>
-          </CardContent>
-        </Card>
-
-        {/* AI Analysis Actions */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Brain className="h-5 w-5" />
-              AI Analysis
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              <Button 
-                onClick={() => handleAiAnalysis('value')}
-                disabled={isAnalyzing}
-                variant="outline"
-                className="flex items-center gap-2"
-              >
-                {isAnalyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Brain className="h-4 w-4" />}
-                Value Analysis
-              </Button>
-              <Button 
-                onClick={() => handleAiAnalysis('categorize')}
-                disabled={isAnalyzing}
-                variant="outline"
-                className="flex items-center gap-2"
-              >
-                {isAnalyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Brain className="h-4 w-4" />}
-                Categorize Items
-              </Button>
-              <Button 
-                onClick={() => handleAiAnalysis('insights')}
-                disabled={isAnalyzing}
-                variant="outline"
-                className="flex items-center gap-2"
-              >
-                {isAnalyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Brain className="h-4 w-4" />}
-                Generate Insights
-              </Button>
-            </div>
-            {isAnalyzing && (
-              <p className="text-sm text-muted-foreground mt-2">
-                Analyzing your inventory with AI...
-              </p>
-            )}
           </CardContent>
         </Card>
 
@@ -377,13 +259,11 @@ export default function Review() {
                         }}
                       />
                     </th>
-                    <th className="p-4">Item</th>
-                    <th className="p-4">Category</th>
-                    <th className="p-4">Room</th>
-                    <th className="p-4">Qty</th>
-                    <th className="p-4">Volume (m³)</th>
-                    <th className="p-4">Weight (kg)</th>
-                    <th className="p-4">Confidence</th>
+                    <th className="p-4">Item Name</th>
+                    <th className="p-4">Quantity</th>
+                    <th className="p-4">Volume (cu ft)</th>
+                    <th className="p-4">Weight (lbs)</th>
+                    <th className="p-4">Notes</th>
                     <th className="p-4">Actions</th>
                   </tr>
                 </thead>
@@ -398,18 +278,11 @@ export default function Review() {
                       </td>
                       <td className="p-4">
                         <div className="flex items-center gap-3">
-                          {item.thumbnail && (
-                            <img 
-                              src={item.thumbnail} 
-                              alt={item.label}
-                              className="w-12 h-12 object-cover rounded border"
-                            />
-                          )}
                           <div>
                             {editingItem === item.id ? (
                               <Input
-                                value={item.label}
-                                onChange={(e) => updateItem(item.id, { label: e.target.value })}
+                                value={item.name}
+                                onChange={(e) => updateItem(item.id, { name: e.target.value })}
                                 className="h-8"
                                 onBlur={() => setEditingItem(null)}
                                 onKeyDown={(e) => e.key === 'Enter' && setEditingItem(null)}
@@ -420,7 +293,7 @@ export default function Review() {
                                 className="font-medium cursor-pointer hover:text-primary"
                                 onClick={() => setEditingItem(item.id)}
                               >
-                                {item.label}
+                                {item.name}
                               </div>
                             )}
                             {item.notes && (
@@ -430,36 +303,6 @@ export default function Review() {
                             )}
                           </div>
                         </div>
-                      </td>
-                      <td className="p-4">
-                        <Select 
-                          value={item.category} 
-                          onValueChange={(value) => updateItem(item.id, { category: value })}
-                        >
-                          <SelectTrigger className="h-8 w-32">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {categories.map(cat => (
-                              <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </td>
-                      <td className="p-4">
-                        <Select 
-                          value={item.room} 
-                          onValueChange={(value) => updateItem(item.id, { room: value })}
-                        >
-                          <SelectTrigger className="h-8 w-32">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {rooms.map(room => (
-                              <SelectItem key={room} value={room}>{room}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
                       </td>
                       <td className="p-4">
                         <Input
@@ -473,8 +316,8 @@ export default function Review() {
                       <td className="p-4">
                         <Input
                           type="number"
-                          value={item.estimatedVolume}
-                          onChange={(e) => updateItem(item.id, { estimatedVolume: parseFloat(e.target.value) || 0 })}
+                          value={item.volume}
+                          onChange={(e) => updateItem(item.id, { volume: parseFloat(e.target.value) || 0 })}
                           className="h-8 w-20"
                           step="0.1"
                           min="0"
@@ -483,17 +326,20 @@ export default function Review() {
                       <td className="p-4">
                         <Input
                           type="number"
-                          value={item.estimatedWeight}
-                          onChange={(e) => updateItem(item.id, { estimatedWeight: parseFloat(e.target.value) || 0 })}
+                          value={item.weight}
+                          onChange={(e) => updateItem(item.id, { weight: parseFloat(e.target.value) || 0 })}
                           className="h-8 w-20"
                           step="0.5"
                           min="0"
                         />
                       </td>
                       <td className="p-4">
-                        <Badge variant="secondary" className={getConfidenceColor(item.confidence)}>
-                          {item.confidence}
-                        </Badge>
+                        <Input
+                          value={item.notes || ''}
+                          onChange={(e) => updateItem(item.id, { notes: e.target.value })}
+                          className="h-8 w-32"
+                          placeholder="Add notes..."
+                        />
                       </td>
                       <td className="p-4">
                         <Button
@@ -529,43 +375,15 @@ export default function Review() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
                   <label className="text-sm font-medium mb-2 block">Item Name *</label>
                   <Input
-                    value={newItem.label || ''}
-                    onChange={(e) => setNewItem({...newItem, label: e.target.value})}
+                    value={newItem.name || ''}
+                    onChange={(e) => setNewItem({...newItem, name: e.target.value})}
                     placeholder="e.g., Sofa, Box, Table"
                   />
                 </div>
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Category *</label>
-                  <Select value={newItem.category || ''} onValueChange={(value) => setNewItem({...newItem, category: value})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map(cat => (
-                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Room *</label>
-                  <Select value={newItem.room || ''} onValueChange={(value) => setNewItem({...newItem, room: value})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select room" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {rooms.map(room => (
-                        <SelectItem key={room} value={room}>{room}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="text-sm font-medium mb-2 block">Quantity</label>
                   <Input
@@ -576,21 +394,21 @@ export default function Review() {
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Volume (m³)</label>
+                  <label className="text-sm font-medium mb-2 block">Volume (cu ft)</label>
                   <Input
                     type="number"
-                    value={newItem.estimatedVolume || 0}
-                    onChange={(e) => setNewItem({...newItem, estimatedVolume: parseFloat(e.target.value) || 0})}
+                    value={newItem.volume || 0}
+                    onChange={(e) => setNewItem({...newItem, volume: parseFloat(e.target.value) || 0})}
                     step="0.1"
                     min="0"
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Weight (kg)</label>
+                  <label className="text-sm font-medium mb-2 block">Weight (lbs)</label>
                   <Input
                     type="number"
-                    value={newItem.estimatedWeight || 0}
-                    onChange={(e) => setNewItem({...newItem, estimatedWeight: parseFloat(e.target.value) || 0})}
+                    value={newItem.weight || 0}
+                    onChange={(e) => setNewItem({...newItem, weight: parseFloat(e.target.value) || 0})}
                     step="0.5"
                     min="0"
                   />
@@ -617,31 +435,6 @@ export default function Review() {
           </Card>
         )}
 
-        {/* AI Analysis Results */}
-        {aiAnalysis && (
-          <Card className="mb-8">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <Brain className="h-5 w-5" />
-                  AI Analysis Results
-                </CardTitle>
-                <Button 
-                  onClick={() => setAiAnalysis('')}
-                  variant="outline"
-                  size="sm"
-                >
-                  Clear Analysis
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="whitespace-pre-wrap text-sm bg-muted p-4 rounded-md max-h-96 overflow-y-auto">
-                {aiAnalysis}
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         {/* Navigation */}
         <div className="flex justify-between">

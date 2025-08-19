@@ -1,10 +1,11 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, Upload, Camera, X } from "lucide-react";
+import { ArrowLeft, Upload, Camera, X, Loader2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useState, useRef } from "react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 interface UploadedFile {
   id: string;
@@ -17,6 +18,7 @@ interface UploadedFile {
 const UploadPage = () => {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
@@ -60,31 +62,53 @@ const UploadPage = () => {
     setIsDragging(false);
   };
 
+  const convertFileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleAnalyze = async () => {
     if (files.length === 0) {
       toast.error("Please upload at least one photo");
       return;
     }
 
-    // For MVP, we'll simulate AI analysis and create sample data based on uploaded photos
-    const mockAnalysisResults = files.map((file, index) => ({
-      id: `item_${index + 1}`,
-      label: `Item from ${file.file.name}`,
-      category: ['Furniture', 'Electronics', 'Boxes', 'Appliances'][index % 4],
-      room: ['Living Room', 'Bedroom', 'Kitchen', 'Office'][index % 4],
-      quantity: Math.floor(Math.random() * 3) + 1,
-      estimatedVolume: parseFloat((Math.random() * 2 + 0.5).toFixed(1)),
-      estimatedWeight: Math.floor(Math.random() * 50 + 5),
-      confidence: ['high', 'medium', 'low'][Math.floor(Math.random() * 3)] as 'high' | 'medium' | 'low',
-      thumbnail: file.preview,
-      sourceImage: file.file.name
-    }));
+    setIsAnalyzing(true);
+    try {
+      // Convert files to base64
+      const imagePromises = files.map(file => convertFileToBase64(file.file));
+      const base64Images = await Promise.all(imagePromises);
+      
+      toast.info("Analyzing photos with AI...", { duration: 2000 });
 
-    // Store the analysis results in localStorage for the Review page
-    localStorage.setItem('inventoryAnalysis', JSON.stringify(mockAnalysisResults));
-    
-    toast.success(`Analyzed ${files.length} photos and found ${mockAnalysisResults.length} items!`);
-    navigate('/review');
+      // Call the analyze-inventory edge function
+      const { data, error } = await supabase.functions.invoke('analyze-inventory', {
+        body: { 
+          images: base64Images
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.items && data.items.length > 0) {
+        // Store the analysis results in localStorage for the Review page
+        localStorage.setItem('inventoryAnalysis', JSON.stringify(data.items));
+        
+        toast.success(`Analyzed ${files.length} photos and found ${data.items.length} items!`);
+        navigate('/review');
+      } else {
+        toast.error("No items were detected in the photos. Please try different images.");
+      }
+    } catch (error) {
+      console.error('Analysis error:', error);
+      toast.error('Failed to analyze photos. Please try again.');
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   return (
@@ -197,10 +221,17 @@ const UploadPage = () => {
             </Button>
             <Button 
               onClick={handleAnalyze}
-              disabled={files.length === 0}
+              disabled={files.length === 0 || isAnalyzing}
               size="lg"
             >
-              Analyze Items ({files.length} photos)
+              {isAnalyzing ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Analyzing...
+                </>
+              ) : (
+                `Analyze Items (${files.length} photos)`
+              )}
             </Button>
           </div>
         </div>
