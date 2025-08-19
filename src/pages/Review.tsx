@@ -580,9 +580,14 @@ export default function Review() {
 
         {/* Navigation */}
         <div className="flex justify-between">
-          <Button variant="outline" onClick={() => navigate(sessionId ? `/upload?session=${sessionId}` : '/upload')}>
-            Upload More Photos
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => navigate(sessionId ? `/upload?session=${sessionId}` : '/upload')}>
+              Upload More Photos
+            </Button>
+            <Button variant="outline" onClick={() => navigate('/upload')}>
+              New Inventory
+            </Button>
+          </div>
           <Button onClick={() => navigate('/finalize')}>
             Finalize Report
           </Button>

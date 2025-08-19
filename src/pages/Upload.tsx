@@ -217,14 +217,25 @@ const UploadPage = () => {
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
-          <Link to="/start">
-            <Button variant="ghost" size="sm">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-4">
+            <Link to="/start">
+              <Button variant="ghost" size="sm">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back
+              </Button>
+            </Link>
+            <h1 className="text-2xl font-bold">Upload Photos</h1>
+          </div>
+          {currentSession && (
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => navigate('/upload')}
+            >
+              New Inventory
             </Button>
-          </Link>
-          <h1 className="text-2xl font-bold">Upload Photos</h1>
+          )}
         </div>
 
         <div className="max-w-4xl mx-auto">
