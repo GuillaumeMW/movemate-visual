@@ -2,8 +2,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, Upload, Camera, X, Loader2 } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
-import { useState, useRef } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -19,8 +19,34 @@ const UploadPage = () => {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [currentSession, setCurrentSession] = useState<any>(null);
+  const [searchParams] = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const sessionId = searchParams.get('session');
+    if (sessionId) {
+      loadExistingSession(sessionId);
+    }
+  }, [searchParams]);
+
+  const loadExistingSession = async (sessionId: string) => {
+    try {
+      const { data: session, error } = await supabase
+        .from('inventory_sessions')
+        .select('*')
+        .eq('id', sessionId)
+        .single();
+
+      if (error) throw error;
+      setCurrentSession(session);
+      toast.success(`Continuing with existing session: ${session.name}`);
+    } catch (error) {
+      console.error('Error loading session:', error);
+      toast.error('Could not load existing session');
+    }
+  };
 
   const handleFileSelect = (selectedFiles: FileList | null) => {
     if (!selectedFiles) return;
@@ -79,17 +105,22 @@ const UploadPage = () => {
 
     setIsAnalyzing(true);
     try {
-      // Create inventory session
-      const { data: session, error: sessionError } = await supabase
-        .from('inventory_sessions')
-        .insert({
-          name: `Inventory Session ${new Date().toLocaleDateString()}`,
-          status: 'active'
-        })
-        .select()
-        .single();
+      // Use existing session or create a new one
+      let session = currentSession;
+      
+      if (!session) {
+        const { data: newSession, error: sessionError } = await supabase
+          .from('inventory_sessions')
+          .insert({
+            name: `Inventory Session ${new Date().toLocaleDateString()}`,
+            status: 'active'
+          })
+          .select()
+          .single();
 
-      if (sessionError) throw sessionError;
+        if (sessionError) throw sessionError;
+        session = newSession;
+      }
 
       // Upload files to Supabase Storage and track them
       const uploadPromises = files.map(async (file, index) => {
@@ -149,9 +180,17 @@ const UploadPage = () => {
 
         if (itemsError) throw itemsError;
 
-        // Update session totals
-        const totalVolume = data.items.reduce((sum: number, item: any) => sum + (item.volume * item.quantity), 0);
-        const totalWeight = data.items.reduce((sum: number, item: any) => sum + (item.weight * item.quantity), 0);
+        // Get existing items to calculate totals correctly
+        const { data: existingItems, error: fetchError } = await supabase
+          .from('inventory_items')
+          .select('*')
+          .eq('session_id', session.id);
+
+        if (fetchError) throw fetchError;
+
+        // Update session totals with all items
+        const totalVolume = existingItems.reduce((sum, item) => sum + (item.volume * item.quantity), 0);
+        const totalWeight = existingItems.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
 
         await supabase
           .from('inventory_sessions')
@@ -189,6 +228,25 @@ const UploadPage = () => {
         </div>
 
         <div className="max-w-4xl mx-auto">
+          {/* Session Info */}
+          {currentSession && (
+            <div className="mb-6 p-4 bg-primary/10 border border-primary/20 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-primary">Continuing Session</h3>
+                  <p className="text-sm text-muted-foreground">{currentSession.name}</p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`/review?session=${currentSession.id}`)}
+                >
+                  View Existing Items
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Upload Area */}
           <Card className="mb-8">
             <CardHeader>
