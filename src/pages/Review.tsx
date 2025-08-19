@@ -110,7 +110,7 @@ export default function Review() {
             .from('uploaded_images')
             .select('*')
             .eq('session_id', sessionId)
-            .order('analyzed_at', { ascending: true })
+            .order('file_path', { ascending: true })
         ]);
 
         if (sessionResult.error) throw sessionResult.error;
@@ -119,7 +119,14 @@ export default function Review() {
 
         setSessionInfo(sessionResult.data);
         setItems(itemsResult.data || []);
-        setUploadedImages(imagesResult.data || []);
+        
+        // Sort uploaded images by the image number in file path
+        const sortedImages = (imagesResult.data || []).sort((a, b) => {
+          const aNum = parseInt(a.file_path.split('_')[1]) || 0;
+          const bNum = parseInt(b.file_path.split('_')[1]) || 0;
+          return aNum - bNum;
+        });
+        setUploadedImages(sortedImages);
       } catch (error) {
         console.error('Error loading inventory data:', error);
         toast.error('Failed to load inventory data');
