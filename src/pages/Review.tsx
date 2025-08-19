@@ -110,7 +110,7 @@ export default function Review() {
             .from('uploaded_images')
             .select('*')
             .eq('session_id', sessionId)
-            .order('analyzed_at', { ascending: true })
+            .order('id', { ascending: true })
         ]);
 
         if (sessionResult.error) throw sessionResult.error;
