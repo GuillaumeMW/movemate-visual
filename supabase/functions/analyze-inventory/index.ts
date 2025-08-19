@@ -33,7 +33,7 @@ serve(async (req) => {
     
     console.log('Processing', images.length, 'images');
     
-    const systemPrompt = 'Please make an inventory of items to be moved and estimate a move volume in cu ft based on the pictures provided. Make sure to only count each item once even if shown on more than one picture. Regroup similar items, for example (4 wooden dinning chairs). For miscellaneous items or items that can be boxed, estimate a box count. You can use small, medium or large size boxes. Return a JSON array where each item has: name (string), quantity (number), volume (number in cu ft), weight (number in lbs).';
+    const systemPrompt = 'Please make an inventory of items to be moved and estimate a move volume in cu ft based on the pictures provided. Make sure to only count each item once even if shown on more than one picture. Regroup similar items, for example (4 wooden dinning chairs). For miscellaneous items or items that can be boxed, estimate a box count. You can use small, medium or large size boxes. For each item, mention on which photo you found it for easy tracking (use photo numbers 1, 2, 3, etc.). Return a JSON array where each item has: name (string), quantity (number), volume (number in cu ft), weight (number in lbs), found_in_image (number indicating which photo, starting from 1).';
 
     // Prepare messages with images - limit image size for API
     const processedImages = images.map((image: string) => {
