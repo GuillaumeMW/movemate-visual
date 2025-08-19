@@ -169,7 +169,8 @@ const UploadPage = () => {
           const { data, error } = await supabase.functions.invoke('analyze-inventory', {
             body: { 
               image: base64Image,
-              imageNumber: i + 1
+              imageNumber: i + 1,
+              existingItems: allItems
             }
           });
 

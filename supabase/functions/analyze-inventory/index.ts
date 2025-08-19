@@ -24,7 +24,7 @@ serve(async (req) => {
     const body = await req.json();
     console.log('Request body received, keys:', Object.keys(body));
     
-    const { image, imageNumber } = body;
+    const { image, imageNumber, existingItems = [] } = body;
     
     if (!image || typeof image !== 'string') {
       console.error('No image provided or image is not a string');
@@ -33,6 +33,13 @@ serve(async (req) => {
     
     console.log('Processing single image, number:', imageNumber);
     
+    // Build existing items context
+    let existingItemsContext = '';
+    if (existingItems && existingItems.length > 0) {
+      const itemList = existingItems.map(item => `- ${item.name} (qty: ${item.quantity})`).join('\n');
+      existingItemsContext = `\n\nITEMS ALREADY FOUND IN PREVIOUS IMAGES:\n${itemList}\n\nDO NOT DUPLICATE these items unless you see additional quantities in this new photo.`;
+    }
+
     const systemPrompt = `You are analyzing photos for a moving inventory. Create a conservative inventory focused on PRIMARY items that are clearly visible and likely to be moved. 
 
 CRITICAL INSTRUCTIONS:
@@ -42,7 +49,7 @@ CRITICAL INSTRUCTIONS:
 - For furniture, only count major pieces (sofas, beds, tables, not small decorative items)
 - For kitchen items, focus on appliances and major cookware, not every dish or utensil
 - Avoid counting items that typically stay with a property (light fixtures, cabinets, countertops)
-- Group similar small items together (e.g., "Books" rather than listing each book)
+- Group similar small items together (e.g., "Books" rather than listing each book)${existingItemsContext}
 
 Return a JSON array where each item has: name (string), quantity (number), volume (number in cu ft), weight (number in lbs).`;
 
