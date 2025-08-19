@@ -76,7 +76,21 @@ const rooms = ['Living Room', 'Bedroom', 'Kitchen', 'Dining Room', 'Bathroom', '
 
 export default function Review() {
   const navigate = useNavigate();
-  const [items, setItems] = useState<InventoryItem[]>(mockItems);
+  
+  // Load items from localStorage (from Upload page) or fall back to mock data
+  const loadInventoryItems = (): InventoryItem[] => {
+    const storedData = localStorage.getItem('inventoryAnalysis');
+    if (storedData) {
+      try {
+        return JSON.parse(storedData);
+      } catch (error) {
+        console.error('Error parsing stored inventory data:', error);
+      }
+    }
+    return mockItems; // Fallback to mock data
+  };
+
+  const [items, setItems] = useState<InventoryItem[]>(loadInventoryItems());
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [editingItem, setEditingItem] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -259,6 +273,35 @@ export default function Review() {
             </CardContent>
           </Card>
         )}
+
+        {/* Data Source Info */}
+        <Card className="mb-6 border-blue-200 bg-blue-50">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-blue-900">
+                  {localStorage.getItem('inventoryAnalysis') 
+                    ? `Showing ${items.length} items analyzed from your uploaded photos` 
+                    : `Showing ${items.length} sample items (upload photos to see real analysis)`}
+                </p>
+                {localStorage.getItem('inventoryAnalysis') && (
+                  <p className="text-xs text-blue-700 mt-1">
+                    You can edit any field below or use AI analysis for insights
+                  </p>
+                )}
+              </div>
+              {!localStorage.getItem('inventoryAnalysis') && (
+                <Button 
+                  onClick={() => navigate('/upload')}
+                  size="sm"
+                  variant="outline"
+                >
+                  Upload Photos
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* AI Analysis Actions */}
         <Card className="mb-6">

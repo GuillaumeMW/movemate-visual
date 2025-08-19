@@ -60,12 +60,30 @@ const UploadPage = () => {
     setIsDragging(false);
   };
 
-  const handleAnalyze = () => {
+  const handleAnalyze = async () => {
     if (files.length === 0) {
       toast.error("Please upload at least one photo");
       return;
     }
-    // For MVP, we'll navigate to review with mock data
+
+    // For MVP, we'll simulate AI analysis and create sample data based on uploaded photos
+    const mockAnalysisResults = files.map((file, index) => ({
+      id: `item_${index + 1}`,
+      label: `Item from ${file.file.name}`,
+      category: ['Furniture', 'Electronics', 'Boxes', 'Appliances'][index % 4],
+      room: ['Living Room', 'Bedroom', 'Kitchen', 'Office'][index % 4],
+      quantity: Math.floor(Math.random() * 3) + 1,
+      estimatedVolume: parseFloat((Math.random() * 2 + 0.5).toFixed(1)),
+      estimatedWeight: Math.floor(Math.random() * 50 + 5),
+      confidence: ['high', 'medium', 'low'][Math.floor(Math.random() * 3)] as 'high' | 'medium' | 'low',
+      thumbnail: file.preview,
+      sourceImage: file.file.name
+    }));
+
+    // Store the analysis results in localStorage for the Review page
+    localStorage.setItem('inventoryAnalysis', JSON.stringify(mockAnalysisResults));
+    
+    toast.success(`Analyzed ${files.length} photos and found ${mockAnalysisResults.length} items!`);
     navigate('/review');
   };
 
