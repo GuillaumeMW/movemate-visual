@@ -126,7 +126,7 @@ const UploadPage = () => {
       // Upload files to Supabase Storage and track them
       const uploadPromises = files.map(async (file, index) => {
         const fileExt = file.file.name.split('.').pop();
-        const fileName = `${session.id}_${index}_${Date.now()}.${fileExt}`;
+        const fileName = `${session.id}_${index + 1}_${Date.now()}.${fileExt}`;
         
         const { error: uploadError } = await supabase.storage
           .from('inventory-images')
