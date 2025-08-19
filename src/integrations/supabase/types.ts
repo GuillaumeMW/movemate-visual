@@ -14,7 +14,115 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      inventory_items: {
+        Row: {
+          ai_generated: boolean | null
+          created_at: string
+          id: string
+          name: string
+          notes: string | null
+          quantity: number
+          session_id: string
+          updated_at: string
+          volume: number
+          weight: number
+        }
+        Insert: {
+          ai_generated?: boolean | null
+          created_at?: string
+          id?: string
+          name: string
+          notes?: string | null
+          quantity?: number
+          session_id: string
+          updated_at?: string
+          volume?: number
+          weight?: number
+        }
+        Update: {
+          ai_generated?: boolean | null
+          created_at?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          quantity?: number
+          session_id?: string
+          updated_at?: string
+          volume?: number
+          weight?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_items_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_sessions: {
+        Row: {
+          created_at: string
+          id: string
+          name: string | null
+          status: string | null
+          total_volume: number | null
+          total_weight: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name?: string | null
+          status?: string | null
+          total_volume?: number | null
+          total_weight?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string | null
+          status?: string | null
+          total_volume?: number | null
+          total_weight?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      uploaded_images: {
+        Row: {
+          analyzed_at: string
+          file_name: string
+          file_path: string
+          id: string
+          session_id: string
+        }
+        Insert: {
+          analyzed_at?: string
+          file_name: string
+          file_path: string
+          id?: string
+          session_id: string
+        }
+        Update: {
+          analyzed_at?: string
+          file_name?: string
+          file_path?: string
+          id?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "uploaded_images_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
