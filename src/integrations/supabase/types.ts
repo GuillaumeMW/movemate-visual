@@ -20,6 +20,7 @@ export type Database = {
           created_at: string
           found_in_image: number | null
           id: string
+          is_going: boolean
           name: string
           notes: string | null
           quantity: number
@@ -33,6 +34,7 @@ export type Database = {
           created_at?: string
           found_in_image?: number | null
           id?: string
+          is_going?: boolean
           name: string
           notes?: string | null
           quantity?: number
@@ -46,6 +48,7 @@ export type Database = {
           created_at?: string
           found_in_image?: number | null
           id?: string
+          is_going?: boolean
           name?: string
           notes?: string | null
           quantity?: number
