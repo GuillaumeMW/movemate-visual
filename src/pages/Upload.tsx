@@ -79,7 +79,44 @@ const UploadPage = () => {
 
     setIsAnalyzing(true);
     try {
-      // Convert files to base64
+      // Create inventory session
+      const { data: session, error: sessionError } = await supabase
+        .from('inventory_sessions')
+        .insert({
+          name: `Inventory Session ${new Date().toLocaleDateString()}`,
+          status: 'active'
+        })
+        .select()
+        .single();
+
+      if (sessionError) throw sessionError;
+
+      // Upload files to Supabase Storage and track them
+      const uploadPromises = files.map(async (file, index) => {
+        const fileExt = file.file.name.split('.').pop();
+        const fileName = `${session.id}_${index}_${Date.now()}.${fileExt}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('inventory-images')
+          .upload(fileName, file.file);
+
+        if (uploadError) throw uploadError;
+
+        // Track the uploaded image
+        await supabase
+          .from('uploaded_images')
+          .insert({
+            session_id: session.id,
+            file_path: fileName,
+            file_name: file.file.name
+          });
+
+        return fileName;
+      });
+
+      const uploadedFiles = await Promise.all(uploadPromises);
+      
+      // Convert files to base64 for AI analysis
       const imagePromises = files.map(file => convertFileToBase64(file.file));
       const base64Images = await Promise.all(imagePromises);
       
@@ -95,11 +132,37 @@ const UploadPage = () => {
       if (error) throw error;
 
       if (data.items && data.items.length > 0) {
-        // Store the analysis results in localStorage for the Review page
-        localStorage.setItem('inventoryAnalysis', JSON.stringify(data.items));
+        // Save analysis results to database
+        const itemsToInsert = data.items.map((item: any) => ({
+          session_id: session.id,
+          name: item.name,
+          quantity: item.quantity,
+          volume: item.volume,
+          weight: item.weight,
+          notes: item.notes,
+          ai_generated: true
+        }));
+
+        const { error: itemsError } = await supabase
+          .from('inventory_items')
+          .insert(itemsToInsert);
+
+        if (itemsError) throw itemsError;
+
+        // Update session totals
+        const totalVolume = data.items.reduce((sum: number, item: any) => sum + (item.volume * item.quantity), 0);
+        const totalWeight = data.items.reduce((sum: number, item: any) => sum + (item.weight * item.quantity), 0);
+
+        await supabase
+          .from('inventory_sessions')
+          .update({
+            total_volume: totalVolume,
+            total_weight: totalWeight
+          })
+          .eq('id', session.id);
         
         toast.success(`Analyzed ${files.length} photos and found ${data.items.length} items!`);
-        navigate('/review');
+        navigate(`/review?session=${session.id}`);
       } else {
         toast.error("No items were detected in the photos. Please try different images.");
       }

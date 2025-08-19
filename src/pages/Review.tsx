@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Trash2, Edit3, Plus, Save, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface InventoryItem {
   id: string;
@@ -53,29 +54,65 @@ const mockItems: InventoryItem[] = [
 
 export default function Review() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const sessionId = searchParams.get('session');
   
-  // Load items from localStorage (from Upload page) or fall back to mock data
-  const loadInventoryItems = (): InventoryItem[] => {
-    const storedData = localStorage.getItem('inventoryAnalysis');
-    if (storedData) {
-      try {
-        const parsed = JSON.parse(storedData);
-        // Check if the data has the new structure (name, volume, weight instead of label, estimatedVolume, estimatedWeight)
-        if (parsed.length > 0 && parsed[0].name && typeof parsed[0].volume === 'number') {
-          return parsed;
-        } else {
-          // Clear old data format
-          localStorage.removeItem('inventoryAnalysis');
-        }
-      } catch (error) {
-        console.error('Error parsing stored inventory data:', error);
-        localStorage.removeItem('inventoryAnalysis');
-      }
-    }
-    return mockItems; // Fallback to mock data
-  };
+  const [items, setItems] = useState<InventoryItem[]>([]);
+  const [sessionInfo, setSessionInfo] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const [items, setItems] = useState<InventoryItem[]>(loadInventoryItems());
+  // Load inventory items from database
+  useEffect(() => {
+    const loadInventoryData = async () => {
+      if (!sessionId) {
+        // Fallback to localStorage if no session ID (backward compatibility)
+        const storedData = localStorage.getItem('inventoryAnalysis');
+        if (storedData) {
+          try {
+            const parsed = JSON.parse(storedData);
+            setItems(parsed);
+          } catch (error) {
+            console.error('Error parsing stored inventory data:', error);
+            setItems(mockItems);
+          }
+        } else {
+          setItems(mockItems);
+        }
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        // Load session info and items from database
+        const [sessionResult, itemsResult] = await Promise.all([
+          supabase
+            .from('inventory_sessions')
+            .select('*')
+            .eq('id', sessionId)
+            .single(),
+          supabase
+            .from('inventory_items')
+            .select('*')
+            .eq('session_id', sessionId)
+            .order('created_at', { ascending: true })
+        ]);
+
+        if (sessionResult.error) throw sessionResult.error;
+        if (itemsResult.error) throw itemsResult.error;
+
+        setSessionInfo(sessionResult.data);
+        setItems(itemsResult.data || []);
+      } catch (error) {
+        console.error('Error loading inventory data:', error);
+        toast.error('Failed to load inventory data');
+        setItems(mockItems);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadInventoryData();
+  }, [sessionId]);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [editingItem, setEditingItem] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -90,41 +127,99 @@ export default function Review() {
   const totalWeight = items.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
 
-  const updateItem = (id: string, updates: Partial<InventoryItem>) => {
-    setItems(items.map(item => item.id === id ? { ...item, ...updates } : item));
-    setEditingItem(null);
-    toast.success('Item updated');
+  const updateItem = async (id: string, updates: Partial<InventoryItem>) => {
+    try {
+      if (sessionId) {
+        const { error } = await supabase
+          .from('inventory_items')
+          .update(updates)
+          .eq('id', id);
+        
+        if (error) throw error;
+        
+        // Update session totals
+        await updateSessionTotals();
+      }
+      
+      setItems(items.map(item => item.id === id ? { ...item, ...updates } : item));
+      setEditingItem(null);
+      toast.success('Item updated');
+    } catch (error) {
+      console.error('Error updating item:', error);
+      toast.error('Failed to update item');
+    }
   };
 
-  const deleteItem = (id: string) => {
-    setItems(items.filter(item => item.id !== id));
-    toast.success('Item deleted');
+  const deleteItem = async (id: string) => {
+    try {
+      if (sessionId) {
+        const { error } = await supabase
+          .from('inventory_items')
+          .delete()
+          .eq('id', id);
+        
+        if (error) throw error;
+        
+        // Update session totals
+        await updateSessionTotals();
+      }
+      
+      setItems(items.filter(item => item.id !== id));
+      toast.success('Item deleted');
+    } catch (error) {
+      console.error('Error deleting item:', error);
+      toast.error('Failed to delete item');
+    }
   };
 
-  const addNewItem = () => {
+  const addNewItem = async () => {
     if (!newItem.name) {
       toast.error('Please enter an item name');
       return;
     }
 
-    const item: InventoryItem = {
-      id: Date.now().toString(),
-      name: newItem.name!,
-      quantity: newItem.quantity || 1,
-      volume: newItem.volume || 0,
-      weight: newItem.weight || 0,
-      notes: newItem.notes
-    };
+    try {
+      const item: InventoryItem = {
+        id: crypto.randomUUID(),
+        name: newItem.name!,
+        quantity: newItem.quantity || 1,
+        volume: newItem.volume || 0,
+        weight: newItem.weight || 0,
+        notes: newItem.notes
+      };
 
-    setItems([...items, item]);
-    setNewItem({
-      name: '',
-      quantity: 1,
-      volume: 0,
-      weight: 0
-    });
-    setShowAddForm(false);
-    toast.success('Item added');
+      if (sessionId) {
+        const { error } = await supabase
+          .from('inventory_items')
+          .insert({
+            session_id: sessionId,
+            name: item.name,
+            quantity: item.quantity,
+            volume: item.volume,
+            weight: item.weight,
+            notes: item.notes,
+            ai_generated: false
+          });
+        
+        if (error) throw error;
+        
+        // Update session totals
+        await updateSessionTotals();
+      }
+
+      setItems([...items, item]);
+      setNewItem({
+        name: '',
+        quantity: 1,
+        volume: 0,
+        weight: 0
+      });
+      setShowAddForm(false);
+      toast.success('Item added');
+    } catch (error) {
+      console.error('Error adding item:', error);
+      toast.error('Failed to add item');
+    }
   };
 
   const toggleItemSelection = (id: string) => {
@@ -135,10 +230,55 @@ export default function Review() {
     );
   };
 
-  const deleteSelectedItems = () => {
-    setItems(items.filter(item => !selectedItems.includes(item.id)));
-    setSelectedItems([]);
-    toast.success(`${selectedItems.length} items deleted`);
+  const deleteSelectedItems = async () => {
+    try {
+      if (sessionId) {
+        const { error } = await supabase
+          .from('inventory_items')
+          .delete()
+          .in('id', selectedItems);
+        
+        if (error) throw error;
+        
+        // Update session totals
+        await updateSessionTotals();
+      }
+      
+      setItems(items.filter(item => !selectedItems.includes(item.id)));
+      const deletedCount = selectedItems.length;
+      setSelectedItems([]);
+      toast.success(`${deletedCount} items deleted`);
+    } catch (error) {
+      console.error('Error deleting selected items:', error);
+      toast.error('Failed to delete selected items');
+    }
+  };
+
+  // Helper function to update session totals
+  const updateSessionTotals = async () => {
+    if (!sessionId) return;
+    
+    try {
+      const { data: currentItems } = await supabase
+        .from('inventory_items')
+        .select('volume, weight, quantity')
+        .eq('session_id', sessionId);
+
+      if (currentItems) {
+        const totalVolume = currentItems.reduce((sum, item) => sum + (item.volume * item.quantity), 0);
+        const totalWeight = currentItems.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
+
+        await supabase
+          .from('inventory_sessions')
+          .update({
+            total_volume: totalVolume,
+            total_weight: totalWeight
+          })
+          .eq('id', sessionId);
+      }
+    } catch (error) {
+      console.error('Error updating session totals:', error);
+    }
   };
 
 
@@ -210,15 +350,17 @@ export default function Review() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-blue-900">
-                  {localStorage.getItem('inventoryAnalysis') 
-                    ? `Showing ${items.length} items analyzed from your uploaded photos` 
+                  {sessionId && sessionInfo
+                    ? `Session: ${sessionInfo.name} - ${items.length} items` 
                     : `Showing ${items.length} sample items (upload photos to analyze real inventory)`}
                 </p>
                 <p className="text-xs text-blue-700 mt-1">
-                  You can edit quantities, add notes, or add/remove items as needed
+                  {sessionId 
+                    ? `Created: ${new Date(sessionInfo?.created_at).toLocaleDateString()} - All changes are automatically saved`
+                    : 'You can edit quantities, add notes, or add/remove items as needed'}
                 </p>
               </div>
-              {!localStorage.getItem('inventoryAnalysis') && (
+              {!sessionId && (
                 <Button 
                   onClick={() => navigate('/upload')}
                   size="sm"
