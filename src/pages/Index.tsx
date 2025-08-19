@@ -1,3 +1,4 @@
+import React from "react";
 import { Button } from "@/components/ui/button";
 import { Camera, Upload, FileText, Shield, Clock, Download } from "lucide-react";
 import { Link } from "react-router-dom";
