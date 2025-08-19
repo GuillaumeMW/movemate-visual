@@ -425,12 +425,13 @@ export default function Review() {
                         }}
                       />
                     </th>
-                    <th className="p-4">Item Name</th>
-                    <th className="p-4">Quantity</th>
-                    <th className="p-4">Volume (cu ft)</th>
-                    <th className="p-4">Weight (lbs)</th>
-                    <th className="p-4">Notes</th>
-                    <th className="p-4">Actions</th>
+                     <th className="p-4">Item Name</th>
+                     <th className="p-4">Image #</th>
+                     <th className="p-4">Quantity</th>
+                     <th className="p-4">Volume (cu ft)</th>
+                     <th className="p-4">Weight (lbs)</th>
+                     <th className="p-4">Notes</th>
+                     <th className="p-4">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -442,34 +443,39 @@ export default function Review() {
                           onCheckedChange={() => toggleItemSelection(item.id)}
                         />
                       </td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-3">
-                          <div>
-                            {editingItem === item.id ? (
-                              <Input
-                                value={item.name}
-                                onChange={(e) => updateItem(item.id, { name: e.target.value })}
-                                className="h-8"
-                                onBlur={() => setEditingItem(null)}
-                                onKeyDown={(e) => e.key === 'Enter' && setEditingItem(null)}
-                                autoFocus
-                              />
-                            ) : (
-                              <div 
-                                className="font-medium cursor-pointer hover:text-primary"
-                                onClick={() => setEditingItem(item.id)}
-                              >
-                                {item.name}
-                              </div>
-                            )}
-                            {item.notes && (
-                              <div className="text-xs text-muted-foreground mt-1">
-                                {item.notes}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </td>
+                       <td className="p-4">
+                         <div className="flex items-center gap-3">
+                           <div>
+                             {editingItem === item.id ? (
+                               <Input
+                                 value={item.name}
+                                 onChange={(e) => updateItem(item.id, { name: e.target.value })}
+                                 className="h-8"
+                                 onBlur={() => setEditingItem(null)}
+                                 onKeyDown={(e) => e.key === 'Enter' && setEditingItem(null)}
+                                 autoFocus
+                               />
+                             ) : (
+                               <div 
+                                 className="font-medium cursor-pointer hover:text-primary"
+                                 onClick={() => setEditingItem(item.id)}
+                               >
+                                 {item.name}
+                               </div>
+                             )}
+                             {item.notes && (
+                               <div className="text-xs text-muted-foreground mt-1">
+                                 {item.notes}
+                               </div>
+                             )}
+                           </div>
+                         </div>
+                       </td>
+                       <td className="p-4">
+                         <Badge variant="outline" className="text-xs">
+                           #{Math.floor(Math.random() * uploadedImages.length) + 1 || 1}
+                         </Badge>
+                       </td>
                       <td className="p-4">
                         <Input
                           type="number"
@@ -611,27 +617,32 @@ export default function Review() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                {uploadedImages.map((image) => (
-                  <div
-                    key={image.id}
-                    className="relative group cursor-pointer"
-                    onClick={() => setSelectedImage(getImageUrl(image.file_path))}
-                  >
-                    <img
-                      src={getImageUrl(image.file_path)}
-                      alt={image.file_name}
-                      className="w-full h-24 object-cover rounded-lg border hover:border-primary transition-colors"
-                    />
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors rounded-lg flex items-center justify-center">
-                      <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                        <div className="bg-white/90 p-1 rounded text-xs font-medium">
-                          Click to view
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                 {uploadedImages.map((image, index) => (
+                   <div
+                     key={image.id}
+                     className="relative group cursor-pointer"
+                     onClick={() => setSelectedImage(getImageUrl(image.file_path))}
+                   >
+                     <img
+                       src={getImageUrl(image.file_path)}
+                       alt={image.file_name}
+                       className="w-full h-24 object-cover rounded-lg border hover:border-primary transition-colors"
+                     />
+                     <div className="absolute top-2 left-2">
+                       <Badge variant="secondary" className="text-xs font-bold bg-white/90 text-black">
+                         #{index + 1}
+                       </Badge>
+                     </div>
+                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors rounded-lg flex items-center justify-center">
+                       <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                         <div className="bg-white/90 p-1 rounded text-xs font-medium">
+                           Click to view
+                         </div>
+                       </div>
+                     </div>
+                   </div>
+                 ))}
               </div>
             </CardContent>
           </Card>
