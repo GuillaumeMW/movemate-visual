@@ -6,8 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Trash2, Edit3, Plus, Save, X } from 'lucide-react';
+import { Trash2, Edit3, Plus, Save, X, Brain, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface InventoryItem {
   id: string;
@@ -88,6 +89,8 @@ export default function Review() {
     estimatedWeight: 0,
     confidence: 'medium'
   });
+  const [aiAnalysis, setAiAnalysis] = useState<string>('');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const totalVolume = items.reduce((sum, item) => sum + (item.estimatedVolume * item.quantity), 0);
   const totalWeight = items.reduce((sum, item) => sum + (item.estimatedWeight * item.quantity), 0);
@@ -159,6 +162,42 @@ export default function Review() {
     }
   };
 
+  const handleAiAnalysis = async (analysisType: 'value' | 'categorize' | 'insights') => {
+    if (items.length === 0) {
+      toast.error('No items to analyze. Please add some inventory items first.');
+      return;
+    }
+
+    setIsAnalyzing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('analyze-inventory', {
+        body: { 
+          items: items.map(item => ({
+            label: item.label,
+            category: item.category,
+            room: item.room,
+            quantity: item.quantity,
+            estimatedVolume: item.estimatedVolume,
+            estimatedWeight: item.estimatedWeight,
+            confidence: item.confidence,
+            notes: item.notes
+          })),
+          analysisType 
+        }
+      });
+
+      if (error) throw error;
+
+      setAiAnalysis(data.analysis);
+      toast.success(`AI analyzed ${data.itemCount} items for ${analysisType}.`);
+    } catch (error) {
+      console.error('AI Analysis error:', error);
+      toast.error('Failed to analyze inventory. Please try again.');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8 max-w-6xl">
@@ -220,6 +259,52 @@ export default function Review() {
             </CardContent>
           </Card>
         )}
+
+        {/* AI Analysis Actions */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Brain className="h-5 w-5" />
+              AI Analysis
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              <Button 
+                onClick={() => handleAiAnalysis('value')}
+                disabled={isAnalyzing}
+                variant="outline"
+                className="flex items-center gap-2"
+              >
+                {isAnalyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Brain className="h-4 w-4" />}
+                Value Analysis
+              </Button>
+              <Button 
+                onClick={() => handleAiAnalysis('categorize')}
+                disabled={isAnalyzing}
+                variant="outline"
+                className="flex items-center gap-2"
+              >
+                {isAnalyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Brain className="h-4 w-4" />}
+                Categorize Items
+              </Button>
+              <Button 
+                onClick={() => handleAiAnalysis('insights')}
+                disabled={isAnalyzing}
+                variant="outline"
+                className="flex items-center gap-2"
+              >
+                {isAnalyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Brain className="h-4 w-4" />}
+                Generate Insights
+              </Button>
+            </div>
+            {isAnalyzing && (
+              <p className="text-sm text-muted-foreground mt-2">
+                Analyzing your inventory with AI...
+              </p>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Items List */}
         <Card className="mb-8">
@@ -484,6 +569,32 @@ export default function Review() {
                 <Button variant="outline" onClick={() => setShowAddForm(false)}>
                   Cancel
                 </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* AI Analysis Results */}
+        {aiAnalysis && (
+          <Card className="mb-8">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Brain className="h-5 w-5" />
+                  AI Analysis Results
+                </CardTitle>
+                <Button 
+                  onClick={() => setAiAnalysis('')}
+                  variant="outline"
+                  size="sm"
+                >
+                  Clear Analysis
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="whitespace-pre-wrap text-sm bg-muted p-4 rounded-md max-h-96 overflow-y-auto">
+                {aiAnalysis}
               </div>
             </CardContent>
           </Card>
