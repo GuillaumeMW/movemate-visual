@@ -5,8 +5,8 @@ import type {
   ToastProps,
 } from "@/components/ui/toast"
 
-const TOAST_LIMIT = 1
-const TOAST_REMOVE_DELAY = 1000000
+const TOAST_LIMIT = 10
+const TOAST_REMOVE_DELAY = 5000
 
 type ToasterToast = ToastProps & {
   id: string
@@ -155,6 +155,7 @@ function toast({ ...props }: Toast) {
       ...props,
       id,
       open: true,
+      variant: (props.variant || getVariantFromType(props)) as any,
       onOpenChange: (open) => {
         if (!open) dismiss()
       },
@@ -167,6 +168,25 @@ function toast({ ...props }: Toast) {
     update,
   }
 }
+
+// Helper function to determine variant based on toast methods
+function getVariantFromType(props: any): "success" | "default" | "destructive" | "info" | "warning" {
+  if (props.variant) return props.variant
+  // If called via toast.success, toast.error, etc., determine variant
+  return 'default'
+}
+
+// Extend toast with convenience methods
+const extendedToast = Object.assign(toast, {
+  success: (message: string, options?: Omit<Toast, 'variant'>) => 
+    toast({ ...options, description: message, variant: 'success' }),
+  error: (message: string, options?: Omit<Toast, 'variant'>) => 
+    toast({ ...options, description: message, variant: 'destructive' }),
+  info: (message: string, options?: Omit<Toast, 'variant'>) => 
+    toast({ ...options, description: message, variant: 'info' }),
+  warning: (message: string, options?: Omit<Toast, 'variant'>) => 
+    toast({ ...options, description: message, variant: 'warning' }),
+})
 
 function useToast() {
   const [state, setState] = React.useState<State>(memoryState)
@@ -188,4 +208,4 @@ function useToast() {
   }
 }
 
-export { useToast, toast }
+export { useToast, extendedToast as toast }
