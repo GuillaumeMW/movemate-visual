@@ -310,31 +310,46 @@ async function handleRoomDetection(images: string[], apiKey: string) {
 
   const systemPrompt = `You are analyzing photos to identify and map rooms for a moving inventory system. Your task is to:
 
-1. Identify all room types visible in each image
-2. Differentiate between multiple instances of the same room type (e.g., Bedroom 1 vs Bedroom 2)
-3. Assign specific numbered names to rooms when multiple instances exist
+1. Identify all room types visible in each image  
+2. CRITICALLY: Recognize when the same room appears in multiple images from different angles
+3. Only create multiple numbered rooms when they are genuinely different spaces
+
+SAME ROOM IDENTIFICATION (CRITICAL):
+Before creating multiple numbered rooms of the same type, look for these consistency markers:
+- **Architectural features**: Same windows, doors, ceiling height, room shape
+- **Fixed elements**: Built-in cabinets, countertops, flooring patterns, wall colors
+- **Furniture arrangement**: Similar furniture placement and room layout
+- **Lighting conditions**: Natural light sources, window positions
+- **Unique characteristics**: Distinctive fixtures, appliances, or architectural details
+
+ONLY number rooms (e.g., "Bedroom 1", "Bedroom 2") when you can identify DISTINCT:
+- Different room sizes or layouts
+- Different architectural features (windows, doors, built-ins)
+- Different purposes (master bedroom vs guest bedroom)
+- Different locations in the house (upstairs vs downstairs)
 
 ROOM IDENTIFICATION RULES:
+- BE CONSERVATIVE: If unsure whether rooms are the same, assume they are the same room
+- One image can show multiple rooms (open floor plans, doorways)
+- The same room photographed from different angles should have the same name
 - Look for visual cues: furniture, fixtures, layout, purpose
-- When you see multiple rooms of the same type, number them (e.g., "Bedroom 1", "Bedroom 2")  
-- Consider room characteristics: master bedroom vs guest bedroom, main bathroom vs powder room
-- One image can show multiple rooms (open floor plans, doorways, etc.)
-- The same room can appear in multiple images from different angles
+- Consider room characteristics only when they are clearly different spaces
 
 ROOM TYPES TO IDENTIFY:
 - Living Room, Kitchen, Bedroom, Bathroom, Office, Dining Room
 - Garage, Basement, Closet, Laundry Room, Hallway, Other
+- Shed, Outdoor Area, Storage Room, Sun Room, Patio, Deck, Balcony, Attic, Pantry, Mudroom
 
 Return a JSON object with:
 {
-  "rooms_detected": ["Kitchen", "Living Room 1", "Bedroom 1", "Bedroom 2", "Bathroom 1", "Bathroom 2"],
+  "rooms_detected": ["Kitchen", "Living Room", "Bedroom 1", "Bedroom 2", "Bathroom"],
   "image_room_mapping": {
     "image1": ["Kitchen", "Dining Room"],
-    "image2": ["Living Room 1"],
+    "image2": ["Living Room"],
     "image3": ["Bedroom 1"],
     "image4": ["Bedroom 2"],
-    "image5": ["Bathroom 1"],
-    "image6": ["Kitchen", "Living Room 1"]
+    "image5": ["Bathroom"],
+    "image6": ["Kitchen", "Living Room"]
   }
 }`;
 
