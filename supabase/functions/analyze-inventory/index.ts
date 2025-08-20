@@ -45,7 +45,6 @@ serve(async (req) => {
 CRITICAL INSTRUCTIONS:
 - Focus on FOREGROUND items that are the main subject of the photo
 - AVOID background items or built-in fixtures unless they're clearly moveable
-- Be CONSERVATIVE - it's better to miss an item than create duplicates
 - Be mindful of artwork, mirrors hanging on walls, and rugs that would be moved
 - For furniture, only count major pieces (sofas, beds, tables, not small decorative items)
 - For kitchen items, focus on appliances and major cookware, not every dish or utensil
@@ -81,14 +80,13 @@ Return a JSON array where each item has: name (string), quantity (number), volum
             text: `Please analyze this photo and create a conservative moving inventory focusing only on PRIMARY, moveable items in the FOREGROUND. 
 
 AVOID:
-- Built-in appliances, cabinets, fixtures
-- Background/wall decorations unless clearly removable
+- Built-in cabinets, fixtures
 - Small clutter or individual books/dishes (group these)
 - Items that are barely visible or questionable
 
 FOCUS ON:
 - Major furniture pieces
-- Clearly moveable appliances
+- Moveable appliances
 - Obvious personal belongings
 - Items that would require boxes or effort to move
 
