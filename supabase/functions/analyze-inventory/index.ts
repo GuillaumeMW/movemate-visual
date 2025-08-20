@@ -44,41 +44,18 @@ serve(async (req) => {
     const currentRooms = roomMappings[`image${imageNumber}`] || [];
     
     if (existingItems && existingItems.length > 0) {
-      // Group existing items by room for better context
-      const itemsByRoom = existingItems.reduce((acc: any, item: any) => {
-        const room = item.room || 'Unknown';
-        if (!acc[room]) acc[room] = [];
-        acc[room].push(`- ${item.name} (qty: ${item.quantity})`);
-        return acc;
-      }, {});
+      // Create a comprehensive list of already found items to prevent duplication
+      const allFoundItems = existingItems.map((item: any) => 
+        `- ${item.name} (qty: ${item.quantity}) in ${item.room || 'Unknown'}`
+      );
       
-      let contextParts = [];
-      
-      // Show items from rooms that appear in current image
-      for (const room of currentRooms) {
-        if (itemsByRoom[room]) {
-          contextParts.push(`${room}:\n${itemsByRoom[room].join('\n')}`);
-        }
-      }
-      
-      // Show items from other rooms for general awareness
-      const otherRooms = Object.keys(itemsByRoom).filter(room => !currentRooms.includes(room));
-      if (otherRooms.length > 0) {
-        const otherItems = otherRooms.flatMap(room => itemsByRoom[room]).slice(0, 10); // Limit for context size
-        if (otherItems.length > 0) {
-          contextParts.push(`Other rooms:\n${otherItems.join('\n')}`);
-        }
-      }
-      
-      if (contextParts.length > 0) {
-        existingItemsContext = `\n\nITEMS ALREADY FOUND IN PREVIOUS IMAGES:\n${contextParts.join('\n\n')}\n\nDO NOT DUPLICATE these items unless you see additional quantities in this new photo.`;
-      }
+      existingItemsContext = `\n\nITEMS ALREADY CATALOGED IN PREVIOUS IMAGES:\n${allFoundItems.join('\n')}\n\n🚨 CRITICAL: These items have already been recorded. DO NOT list them again unless:\n1. You see CLEARLY ADDITIONAL quantities of the same item in this new photo\n2. The additional items are in a DIFFERENT location/room\n\nIf you see any of these items again, SKIP them completely - they are already in the inventory.`;
     }
     
-    // Build room context for current image
+    // Build room context for current image with strict validation
     let roomContext = '';
     if (currentRooms.length > 0) {
-      roomContext = `\n\nTHIS IMAGE CONTAINS THE FOLLOWING ROOMS: ${currentRooms.join(', ')}\nFor each item you detect, assign it to the appropriate room within this image.`;
+      roomContext = `\n\nTHIS IMAGE CONTAINS THE FOLLOWING ROOMS: ${currentRooms.join(', ')}\n\n🔒 ROOM ASSIGNMENT RULE: You MUST assign each item to one of these EXACT room names: ${currentRooms.join(', ')}. Do not create new room names or variations - use ONLY these detected room names.`;
     }
 
     const systemPrompt = `You are analyzing photos for a moving inventory. Create a conservative inventory focused on PRIMARY items that are clearly visible and likely to be moved. 
