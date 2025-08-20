@@ -21,6 +21,18 @@ const ROOMS = [
   { name: 'Laundry Room', color: 'bg-indigo-100 text-indigo-800 border-indigo-200' },
   { name: 'Hallway', color: 'bg-amber-100 text-amber-800 border-amber-200' },
   
+  // Additional room types
+  { name: 'Shed', color: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
+  { name: 'Outdoor Area', color: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
+  { name: 'Storage Room', color: 'bg-neutral-100 text-neutral-800 border-neutral-200' },
+  { name: 'Sun Room', color: 'bg-orange-100 text-orange-800 border-orange-200' },
+  { name: 'Patio', color: 'bg-lime-100 text-lime-800 border-lime-200' },
+  { name: 'Deck', color: 'bg-teal-100 text-teal-800 border-teal-200' },
+  { name: 'Balcony', color: 'bg-sky-100 text-sky-800 border-sky-200' },
+  { name: 'Attic', color: 'bg-violet-100 text-violet-800 border-violet-200' },
+  { name: 'Pantry', color: 'bg-rose-100 text-rose-800 border-rose-200' },
+  { name: 'Mudroom', color: 'bg-slate-100 text-slate-800 border-slate-200' },
+  
   // Numbered variants for multiple rooms
   { name: 'Living Room 1', color: 'bg-blue-100 text-blue-800 border-blue-200' },
   { name: 'Living Room 2', color: 'bg-blue-100 text-blue-800 border-blue-200' },
@@ -35,7 +47,17 @@ const ROOMS = [
   { name: 'Bathroom 3', color: 'bg-cyan-100 text-cyan-800 border-cyan-200' },
   { name: 'Office 1', color: 'bg-orange-100 text-orange-800 border-orange-200' },
   { name: 'Office 2', color: 'bg-orange-100 text-orange-800 border-orange-200' },
-  
+  { name: 'Dining Room 1', color: 'bg-red-100 text-red-800 border-red-200' },
+  { name: 'Dining Room 2', color: 'bg-red-100 text-red-800 border-red-200' },
+  { name: 'Garage 1', color: 'bg-gray-100 text-gray-800 border-gray-200' },
+  { name: 'Garage 2', color: 'bg-gray-100 text-gray-800 border-gray-200' },
+  { name: 'Storage Room 1', color: 'bg-neutral-100 text-neutral-800 border-neutral-200' },
+  { name: 'Storage Room 2', color: 'bg-neutral-100 text-neutral-800 border-neutral-200' },
+  { name: 'Shed 1', color: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
+  { name: 'Shed 2', color: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
+  { name: 'Outdoor Area 1', color: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
+  { name: 'Outdoor Area 2', color: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
+
   { name: 'Other', color: 'bg-slate-100 text-slate-800 border-slate-200' }
 ];
 
