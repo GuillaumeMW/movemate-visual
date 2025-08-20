@@ -24,7 +24,13 @@ serve(async (req) => {
     const body = await req.json();
     console.log('Request body received, keys:', Object.keys(body));
     
-    const { image, imageNumber, existingItems = [] } = body;
+    const { mode = 'item-analysis', images, image, imageNumber, existingItems = [], roomMappings = {} } = body;
+    
+    // Handle different modes
+    if (mode === 'room-detection') {
+      console.log('Processing room detection for', images?.length || 0, 'images');
+      return await handleRoomDetection(images, OPENAI_API_KEY);
+    }
     
     if (!image || typeof image !== 'string') {
       console.error('No image provided or image is not a string');
@@ -33,11 +39,46 @@ serve(async (req) => {
     
     console.log('Processing single image, number:', imageNumber);
     
-    // Build existing items context
+    // Build existing items context with room awareness
     let existingItemsContext = '';
+    const currentRooms = roomMappings[`image${imageNumber}`] || [];
+    
     if (existingItems && existingItems.length > 0) {
-      const itemList = existingItems.map(item => `- ${item.name} (qty: ${item.quantity})`).join('\n');
-      existingItemsContext = `\n\nITEMS ALREADY FOUND IN PREVIOUS IMAGES:\n${itemList}\n\nDO NOT DUPLICATE these items unless you see additional quantities in this new photo.`;
+      // Group existing items by room for better context
+      const itemsByRoom = existingItems.reduce((acc: any, item: any) => {
+        const room = item.room || 'Unknown';
+        if (!acc[room]) acc[room] = [];
+        acc[room].push(`- ${item.name} (qty: ${item.quantity})`);
+        return acc;
+      }, {});
+      
+      let contextParts = [];
+      
+      // Show items from rooms that appear in current image
+      for (const room of currentRooms) {
+        if (itemsByRoom[room]) {
+          contextParts.push(`${room}:\n${itemsByRoom[room].join('\n')}`);
+        }
+      }
+      
+      // Show items from other rooms for general awareness
+      const otherRooms = Object.keys(itemsByRoom).filter(room => !currentRooms.includes(room));
+      if (otherRooms.length > 0) {
+        const otherItems = otherRooms.flatMap(room => itemsByRoom[room]).slice(0, 10); // Limit for context size
+        if (otherItems.length > 0) {
+          contextParts.push(`Other rooms:\n${otherItems.join('\n')}`);
+        }
+      }
+      
+      if (contextParts.length > 0) {
+        existingItemsContext = `\n\nITEMS ALREADY FOUND IN PREVIOUS IMAGES:\n${contextParts.join('\n\n')}\n\nDO NOT DUPLICATE these items unless you see additional quantities in this new photo.`;
+      }
+    }
+    
+    // Build room context for current image
+    let roomContext = '';
+    if (currentRooms.length > 0) {
+      roomContext = `\n\nTHIS IMAGE CONTAINS THE FOLLOWING ROOMS: ${currentRooms.join(', ')}\nFor each item you detect, assign it to the appropriate room within this image.`;
     }
 
     const systemPrompt = `You are analyzing photos for a moving inventory. Create a conservative inventory focused on PRIMARY items that are clearly visible and likely to be moved. 
@@ -57,9 +98,9 @@ Items that would normally be moved in boxes should be combined into box estimate
 - Large Boxes (4.5 cu ft): Bedding, linens, larger toys, lampshades → estimate large boxes  
 - Extra-Large Boxes (6 cu ft): Comforters, pillows, sports equipment → estimate extra-large boxes
 
-Example: Instead of listing "20 books, 15 CDs, 10 kitchen gadgets" → list "Small Boxes" with quantity 3-4${existingItemsContext}
+Example: Instead of listing "20 books, 15 CDs, 10 kitchen gadgets" → list "Small Boxes" with quantity 3-4${existingItemsContext}${roomContext}
 
-Return a JSON array where each item has: name (string), quantity (number), volume (number in cu ft), weight (number in lbs), room (string - the room where this item is located based on visual context, e.g., "Living Room", "Kitchen", "Bedroom", "Bathroom", "Office", "Garage", "Basement", "Dining Room", "Closet", "Laundry Room").`;
+Return a JSON array where each item has: name (string), quantity (number), volume (number in cu ft), weight (number in lbs), room (string - the specific numbered room where this item is located, must match one of the rooms listed above for this image).`;
 
     // Prepare the image - ensure it's a proper data URL
     let processedImage = image;
@@ -258,3 +299,200 @@ List only items you are confident need to be moved:`
     });
   }
 });
+
+// Room detection handler
+async function handleRoomDetection(images: string[], apiKey: string) {
+  if (!images || images.length === 0) {
+    throw new Error('No images provided for room detection');
+  }
+
+  console.log('Starting room detection for', images.length, 'images');
+
+  const systemPrompt = `You are analyzing photos to identify and map rooms for a moving inventory system. Your task is to:
+
+1. Identify all room types visible in each image
+2. Differentiate between multiple instances of the same room type (e.g., Bedroom 1 vs Bedroom 2)
+3. Assign specific numbered names to rooms when multiple instances exist
+
+ROOM IDENTIFICATION RULES:
+- Look for visual cues: furniture, fixtures, layout, purpose
+- When you see multiple rooms of the same type, number them (e.g., "Bedroom 1", "Bedroom 2")  
+- Consider room characteristics: master bedroom vs guest bedroom, main bathroom vs powder room
+- One image can show multiple rooms (open floor plans, doorways, etc.)
+- The same room can appear in multiple images from different angles
+
+ROOM TYPES TO IDENTIFY:
+- Living Room, Kitchen, Bedroom, Bathroom, Office, Dining Room
+- Garage, Basement, Closet, Laundry Room, Hallway, Other
+
+Return a JSON object with:
+{
+  "rooms_detected": ["Kitchen", "Living Room 1", "Bedroom 1", "Bedroom 2", "Bathroom 1", "Bathroom 2"],
+  "image_room_mapping": {
+    "image1": ["Kitchen", "Dining Room"],
+    "image2": ["Living Room 1"],
+    "image3": ["Bedroom 1"],
+    "image4": ["Bedroom 2"],
+    "image5": ["Bathroom 1"],
+    "image6": ["Kitchen", "Living Room 1"]
+  }
+}`;
+
+  // Prepare all images for the API call
+  const imageMessages = images.map((image, index) => {
+    let processedImage = image;
+    if (!image.startsWith('data:image/')) {
+      processedImage = `data:image/jpeg;base64,${image}`;
+    }
+    
+    return {
+      type: 'image_url',
+      image_url: {
+        url: processedImage,
+        detail: 'low' // Use low detail for room detection to save costs
+      }
+    };
+  });
+
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    { 
+      role: 'user', 
+      content: [
+        {
+          type: 'text',
+          text: `Please analyze these ${images.length} photos and identify all rooms. Pay attention to:
+- Multiple rooms of the same type should be numbered
+- Consider room size, features, and purpose for numbering
+- One image may show multiple rooms
+- The same room may appear in multiple images from different angles
+
+Return the room mapping as specified in the system prompt.`
+        },
+        ...imageMessages
+      ]
+    }
+  ];
+
+  console.log('Making OpenAI API call for room detection');
+
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'gpt-4.1-2025-04-14',
+      messages,
+      max_completion_tokens: 1500,
+    }),
+  });
+
+  console.log('Room detection OpenAI response status:', response.status);
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('OpenAI API error in room detection:', response.status, errorText);
+    throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json();
+  console.log('Room detection response received');
+  
+  if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+    console.error('Invalid OpenAI response structure for room detection:', data);
+    throw new Error('Invalid response from OpenAI API');
+  }
+  
+  const analysisContent = data.choices[0].message.content;
+  console.log('Room detection content length:', analysisContent.length);
+
+  // Parse the JSON response
+  let roomMapping;
+  try {
+    // Extract JSON from response
+    let jsonContent = '';
+    
+    const codeBlockMatch = analysisContent.match(/```json\s*([\s\S]*?)\s*```/);
+    if (codeBlockMatch) {
+      jsonContent = codeBlockMatch[1].trim();
+      console.log('Extracted room detection JSON from markdown');
+    } else {
+      // Find JSON object in content
+      const objStart = analysisContent.indexOf('{');
+      if (objStart !== -1) {
+        let depth = 0;
+        let inString = false;
+        let escaped = false;
+        let objEnd = objStart;
+        
+        for (let i = objStart; i < analysisContent.length; i++) {
+          const char = analysisContent[i];
+          
+          if (escaped) {
+            escaped = false;
+            continue;
+          }
+          
+          if (char === '\\') {
+            escaped = true;
+            continue;
+          }
+          
+          if (char === '"' && !escaped) {
+            inString = !inString;
+            continue;
+          }
+          
+          if (!inString) {
+            if (char === '{') {
+              depth++;
+            } else if (char === '}') {
+              depth--;
+              if (depth === 0) {
+                objEnd = i;
+                break;
+              }
+            }
+          }
+        }
+        
+        if (depth === 0) {
+          jsonContent = analysisContent.substring(objStart, objEnd + 1);
+          console.log('Extracted room detection JSON using depth tracking');
+        }
+      }
+    }
+    
+    if (!jsonContent) {
+      throw new Error('No valid JSON found in room detection response');
+    }
+    
+    roomMapping = JSON.parse(jsonContent);
+    console.log('Successfully parsed room detection JSON');
+    console.log('Rooms detected:', roomMapping.rooms_detected);
+    
+  } catch (parseError) {
+    console.error('Room detection JSON parsing failed:', parseError.message);
+    console.error('Raw response:', analysisContent);
+    
+    // Fallback: create basic room mapping
+    console.log('Using fallback room mapping');
+    roomMapping = {
+      rooms_detected: ["Living Room", "Kitchen", "Bedroom", "Bathroom"],
+      image_room_mapping: {}
+    };
+    
+    // Assign basic rooms to images
+    for (let i = 1; i <= images.length; i++) {
+      roomMapping.image_room_mapping[`image${i}`] = ["Living Room"];
+    }
+  }
+
+  console.log('Room detection completed');
+  
+  return new Response(JSON.stringify(roomMapping), {
+    headers: { 'Content-Type': 'application/json', ...corsHeaders },
+  });
+}

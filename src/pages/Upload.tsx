@@ -149,7 +149,35 @@ const UploadPage = () => {
 
       const uploadedFiles = await Promise.all(uploadPromises);
       
-      // Process images one by one with progress tracking
+      // TWO-PASS ANALYSIS SYSTEM
+      
+      // PASS 1: Room Detection
+      toast.info("Step 1: Detecting rooms across all images...", { duration: 3000 });
+      
+      const allBase64Images = await Promise.all(
+        files.map(file => convertFileToBase64(file.file))
+      );
+      
+      const { data: roomData, error: roomError } = await supabase.functions.invoke('analyze-inventory', {
+        body: { 
+          mode: 'room-detection',
+          images: allBase64Images
+        }
+      });
+
+      if (roomError) {
+        console.error('Room detection error:', roomError);
+        toast.error('Failed to detect rooms. Using default room assignment.');
+      }
+
+      const roomMappings = roomData?.image_room_mapping || {};
+      const detectedRooms = roomData?.rooms_detected || [];
+      
+      console.log('Room detection results:', { roomMappings, detectedRooms });
+      toast.success(`✓ Detected ${detectedRooms.length} rooms: ${detectedRooms.join(', ')}`, { duration: 4000 });
+      
+      // PASS 2: Item Analysis with Room Context
+      toast.info("Step 2: Analyzing items with room context...", { duration: 2000 });
       setAnalysisProgress({ current: 0, total: files.length });
       let allItems: any[] = [];
       
@@ -166,12 +194,14 @@ const UploadPage = () => {
           // Convert file to base64
           const base64Image = await convertFileToBase64(file.file);
           
-          // Call the analyze-inventory edge function for single image
+          // Call the analyze-inventory edge function for single image with room context
           const { data, error } = await supabase.functions.invoke('analyze-inventory', {
             body: { 
+              mode: 'item-analysis',
               image: base64Image,
               imageNumber: i + 1,
-              existingItems: allItems
+              existingItems: allItems,
+              roomMappings: roomMappings
             }
           });
 

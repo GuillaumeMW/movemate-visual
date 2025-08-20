@@ -8,6 +8,7 @@ interface RoomDropdownProps {
 }
 
 const ROOMS = [
+  // Basic room types
   { name: 'Living Room', color: 'bg-blue-100 text-blue-800 border-blue-200' },
   { name: 'Kitchen', color: 'bg-green-100 text-green-800 border-green-200' },
   { name: 'Bedroom', color: 'bg-purple-100 text-purple-800 border-purple-200' },
@@ -19,6 +20,22 @@ const ROOMS = [
   { name: 'Closet', color: 'bg-pink-100 text-pink-800 border-pink-200' },
   { name: 'Laundry Room', color: 'bg-indigo-100 text-indigo-800 border-indigo-200' },
   { name: 'Hallway', color: 'bg-amber-100 text-amber-800 border-amber-200' },
+  
+  // Numbered variants for multiple rooms
+  { name: 'Living Room 1', color: 'bg-blue-100 text-blue-800 border-blue-200' },
+  { name: 'Living Room 2', color: 'bg-blue-100 text-blue-800 border-blue-200' },
+  { name: 'Kitchen 1', color: 'bg-green-100 text-green-800 border-green-200' },
+  { name: 'Kitchen 2', color: 'bg-green-100 text-green-800 border-green-200' },
+  { name: 'Bedroom 1', color: 'bg-purple-100 text-purple-800 border-purple-200' },
+  { name: 'Bedroom 2', color: 'bg-purple-100 text-purple-800 border-purple-200' },
+  { name: 'Bedroom 3', color: 'bg-purple-100 text-purple-800 border-purple-200' },
+  { name: 'Bedroom 4', color: 'bg-purple-100 text-purple-800 border-purple-200' },
+  { name: 'Bathroom 1', color: 'bg-cyan-100 text-cyan-800 border-cyan-200' },
+  { name: 'Bathroom 2', color: 'bg-cyan-100 text-cyan-800 border-cyan-200' },
+  { name: 'Bathroom 3', color: 'bg-cyan-100 text-cyan-800 border-cyan-200' },
+  { name: 'Office 1', color: 'bg-orange-100 text-orange-800 border-orange-200' },
+  { name: 'Office 2', color: 'bg-orange-100 text-orange-800 border-orange-200' },
+  
   { name: 'Other', color: 'bg-slate-100 text-slate-800 border-slate-200' }
 ];
 
