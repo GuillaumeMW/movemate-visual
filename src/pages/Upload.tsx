@@ -7,7 +7,6 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import heic2any from "heic2any";
 
 interface UploadedFile {
   id: string;
@@ -51,23 +50,6 @@ const UploadPage = () => {
     }
   };
 
-  const convertHeicToJpeg = async (file: File): Promise<File> => {
-    try {
-      const convertedBlob = await heic2any({
-        blob: file,
-        toType: "image/jpeg",
-        quality: 0.8
-      }) as Blob;
-      
-      return new File([convertedBlob], file.name.replace(/\.heic$/i, '.jpg'), {
-        type: 'image/jpeg',
-      });
-    } catch (error) {
-      console.error('HEIC conversion failed:', error);
-      throw new Error(`Failed to convert ${file.name} from HEIC format`);
-    }
-  };
-
   const handleFileSelect = async (selectedFiles: FileList | null) => {
     if (!selectedFiles) return;
 
@@ -77,61 +59,49 @@ const UploadPage = () => {
 
     const validFiles: UploadedFile[] = [];
     const errors: string[] = [];
+    const heicFiles: string[] = [];
 
-    // Process files sequentially to handle async HEIC conversion properly
-    for (const file of Array.from(selectedFiles)) {
-      try {
-        // Check if it's a HEIC file (by extension since MIME type is unreliable)
-        const isHeicFile = file.name.toLowerCase().endsWith('.heic');
-        
-        // Check file format
-        if (!supportedFormats.includes(file.type) && !isHeicFile) {
-          errors.push(`${file.name}: Unsupported format. Please use JPG, PNG, GIF, WEBP, or HEIC.`);
-          continue;
-        }
-
-        // Check file size
-        if (file.size > maxSizeInBytes) {
-          errors.push(`${file.name}: File too large. Maximum size is ${maxSizeInMB}MB.`);
-          continue;
-        }
-
-        // Handle HEIC conversion
-        if (isHeicFile) {
-          try {
-            toast.info(`Converting ${file.name} from HEIC...`, { duration: 2000 });
-            const convertedFile = await convertHeicToJpeg(file);
-            
-            validFiles.push({
-              id: Math.random().toString(36).substr(2, 9),
-              file: convertedFile,
-              preview: URL.createObjectURL(convertedFile),
-              uploading: false,
-              progress: 0
-            });
-            
-            toast.success(`✓ Converted ${file.name} to JPEG`);
-          } catch (conversionError) {
-            console.error('HEIC conversion error:', conversionError);
-            errors.push(`${file.name}: Failed to convert from HEIC format`);
-          }
-        } else {
-          // Regular supported file
-          validFiles.push({
-            id: Math.random().toString(36).substr(2, 9),
-            file,
-            preview: URL.createObjectURL(file),
-            uploading: false,
-            progress: 0
-          });
-        }
-      } catch (error) {
-        console.error('File processing error:', error);
-        errors.push(`${file.name}: Processing failed`);
+    Array.from(selectedFiles).forEach(file => {
+      // Check for HEIC files and provide helpful message
+      if (file.name.toLowerCase().endsWith('.heic')) {
+        heicFiles.push(file.name);
+        return;
       }
+
+      // Check file format
+      if (!supportedFormats.includes(file.type)) {
+        errors.push(`${file.name}: Unsupported format. Please use JPG, PNG, GIF, or WEBP.`);
+        return;
+      }
+
+      // Check file size
+      if (file.size > maxSizeInBytes) {
+        errors.push(`${file.name}: File too large. Maximum size is ${maxSizeInMB}MB.`);
+        return;
+      }
+
+      // Add valid file
+      validFiles.push({
+        id: Math.random().toString(36).substr(2, 9),
+        file,
+        preview: URL.createObjectURL(file),
+        uploading: false,
+        progress: 0
+      });
+    });
+
+    // Handle HEIC files with helpful message
+    if (heicFiles.length > 0) {
+      toast.error(
+        `HEIC files detected: ${heicFiles.join(', ')}. Please convert to JPG first using your Photos app.`,
+        { 
+          duration: 8000,
+          description: "iPhone users: Select photos → Share → Save as Files → Choose JPEG format"
+        }
+      );
     }
 
-    // Show errors if any
+    // Show other errors
     if (errors.length > 0) {
       errors.forEach(error => toast.error(error, { duration: 5000 }));
     }
@@ -422,7 +392,7 @@ const UploadPage = () => {
                 <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
                 <h3 className="text-lg font-semibold mb-2">Drag and drop your photos here</h3>
                 <p className="text-muted-foreground mb-4">
-                  Or click to select files. Supports JPG, PNG, GIF, WEBP, HEIC (max 10MB each).
+                  Or click to select files. Supports JPG, PNG, GIF, WEBP (max 10MB each).
                 </p>
                 <div className="flex gap-4 justify-center">
                   <Button
@@ -447,7 +417,7 @@ const UploadPage = () => {
                   ref={fileInputRef}
                   type="file"
                   multiple
-                  accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,.heic"
+                  accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
                   className="hidden"
                   onChange={async (e) => await handleFileSelect(e.target.files)}
                 />
