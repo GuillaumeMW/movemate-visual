@@ -7,6 +7,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import heic2any from "heic2any";
 
 interface UploadedFile {
   id: string;
@@ -50,20 +51,38 @@ const UploadPage = () => {
     }
   };
 
-  const handleFileSelect = (selectedFiles: FileList | null) => {
+  const convertHeicToJpeg = async (file: File): Promise<File> => {
+    try {
+      const convertedBlob = await heic2any({
+        blob: file,
+        toType: "image/jpeg",
+        quality: 0.8
+      }) as Blob;
+      
+      return new File([convertedBlob], file.name.replace(/\.heic$/i, '.jpg'), {
+        type: 'image/jpeg',
+      });
+    } catch (error) {
+      console.error('HEIC conversion failed:', error);
+      throw new Error(`Failed to convert ${file.name} from HEIC format`);
+    }
+  };
+
+  const handleFileSelect = async (selectedFiles: FileList | null) => {
     if (!selectedFiles) return;
 
-    const supportedFormats = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    const supportedFormats = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/heic'];
     const maxSizeInMB = 10; // 10MB limit
     const maxSizeInBytes = maxSizeInMB * 1024 * 1024;
 
     const validFiles: UploadedFile[] = [];
     const errors: string[] = [];
+    const heicConversions: Promise<void>[] = [];
 
     Array.from(selectedFiles).forEach(file => {
-      // Check file format
-      if (!supportedFormats.includes(file.type)) {
-        errors.push(`${file.name}: Unsupported format. Please use JPG, PNG, GIF, or WEBP.`);
+      // Check file format (including HEIC)
+      if (!supportedFormats.includes(file.type) && !file.name.toLowerCase().endsWith('.heic')) {
+        errors.push(`${file.name}: Unsupported format. Please use JPG, PNG, GIF, WEBP, or HEIC.`);
         return;
       }
 
@@ -73,15 +92,39 @@ const UploadPage = () => {
         return;
       }
 
-      // File is valid
-      validFiles.push({
-        id: Math.random().toString(36).substr(2, 9),
-        file,
-        preview: URL.createObjectURL(file),
-        uploading: false,
-        progress: 0
-      });
+      // Handle HEIC conversion
+      if (file.type === 'image/heic' || file.name.toLowerCase().endsWith('.heic')) {
+        const conversionPromise = convertHeicToJpeg(file).then(convertedFile => {
+          const uploadedFile: UploadedFile = {
+            id: Math.random().toString(36).substr(2, 9),
+            file: convertedFile,
+            preview: URL.createObjectURL(convertedFile),
+            uploading: false,
+            progress: 0
+          };
+          validFiles.push(uploadedFile);
+          toast.success(`Converted ${file.name} from HEIC to JPEG`);
+        }).catch(error => {
+          errors.push(`${file.name}: ${error.message}`);
+        });
+        heicConversions.push(conversionPromise);
+      } else {
+        // Regular supported file
+        validFiles.push({
+          id: Math.random().toString(36).substr(2, 9),
+          file,
+          preview: URL.createObjectURL(file),
+          uploading: false,
+          progress: 0
+        });
+      }
     });
+
+    // Wait for all HEIC conversions to complete
+    if (heicConversions.length > 0) {
+      toast.info(`Converting ${heicConversions.length} HEIC file(s)...`, { duration: 2000 });
+      await Promise.all(heicConversions);
+    }
 
     // Show errors if any
     if (errors.length > 0) {
@@ -105,10 +148,10 @@ const UploadPage = () => {
     });
   };
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    handleFileSelect(e.dataTransfer.files);
+    await handleFileSelect(e.dataTransfer.files);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -374,7 +417,7 @@ const UploadPage = () => {
                 <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
                 <h3 className="text-lg font-semibold mb-2">Drag and drop your photos here</h3>
                 <p className="text-muted-foreground mb-4">
-                  Or click to select files. Supports JPG, PNG, GIF, WEBP (max 10MB each).
+                  Or click to select files. Supports JPG, PNG, GIF, WEBP, HEIC (max 10MB each).
                 </p>
                 <div className="flex gap-4 justify-center">
                   <Button
@@ -399,9 +442,8 @@ const UploadPage = () => {
                   ref={fileInputRef}
                   type="file"
                   multiple
-                  accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
-                  className="hidden"
-                  onChange={(e) => handleFileSelect(e.target.files)}
+                  accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,.heic"
+                  onChange={async (e) => await handleFileSelect(e.target.files)}
                 />
               </div>
             </CardContent>
