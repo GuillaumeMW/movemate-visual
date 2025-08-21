@@ -443,6 +443,7 @@ const UploadPage = () => {
                   type="file"
                   multiple
                   accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,.heic"
+                  className="hidden"
                   onChange={async (e) => await handleFileSelect(e.target.files)}
                 />
               </div>
