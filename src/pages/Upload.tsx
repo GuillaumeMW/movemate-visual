@@ -53,15 +53,46 @@ const UploadPage = () => {
   const handleFileSelect = (selectedFiles: FileList | null) => {
     if (!selectedFiles) return;
 
-    const newFiles: UploadedFile[] = Array.from(selectedFiles).map(file => ({
-      id: Math.random().toString(36).substr(2, 9),
-      file,
-      preview: URL.createObjectURL(file),
-      uploading: false,
-      progress: 0
-    }));
+    const supportedFormats = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    const maxSizeInMB = 10; // 10MB limit
+    const maxSizeInBytes = maxSizeInMB * 1024 * 1024;
 
-    setFiles(prev => [...prev, ...newFiles]);
+    const validFiles: UploadedFile[] = [];
+    const errors: string[] = [];
+
+    Array.from(selectedFiles).forEach(file => {
+      // Check file format
+      if (!supportedFormats.includes(file.type)) {
+        errors.push(`${file.name}: Unsupported format. Please use JPG, PNG, GIF, or WEBP.`);
+        return;
+      }
+
+      // Check file size
+      if (file.size > maxSizeInBytes) {
+        errors.push(`${file.name}: File too large. Maximum size is ${maxSizeInMB}MB.`);
+        return;
+      }
+
+      // File is valid
+      validFiles.push({
+        id: Math.random().toString(36).substr(2, 9),
+        file,
+        preview: URL.createObjectURL(file),
+        uploading: false,
+        progress: 0
+      });
+    });
+
+    // Show errors if any
+    if (errors.length > 0) {
+      errors.forEach(error => toast.error(error, { duration: 5000 }));
+    }
+
+    // Add valid files
+    if (validFiles.length > 0) {
+      setFiles(prev => [...prev, ...validFiles]);
+      toast.success(`Added ${validFiles.length} photo(s)`);
+    }
   };
 
   const removeFile = (id: string) => {
@@ -343,7 +374,7 @@ const UploadPage = () => {
                 <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
                 <h3 className="text-lg font-semibold mb-2">Drag and drop your photos here</h3>
                 <p className="text-muted-foreground mb-4">
-                  Or click to select files. Supports JPG, PNG files.
+                  Or click to select files. Supports JPG, PNG, GIF, WEBP (max 10MB each).
                 </p>
                 <div className="flex gap-4 justify-center">
                   <Button
@@ -368,7 +399,7 @@ const UploadPage = () => {
                   ref={fileInputRef}
                   type="file"
                   multiple
-                  accept="image/*"
+                  accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
                   className="hidden"
                   onChange={(e) => handleFileSelect(e.target.files)}
                 />
