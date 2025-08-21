@@ -71,59 +71,64 @@ const UploadPage = () => {
   const handleFileSelect = async (selectedFiles: FileList | null) => {
     if (!selectedFiles) return;
 
-    const supportedFormats = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/heic'];
+    const supportedFormats = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
     const maxSizeInMB = 10; // 10MB limit
     const maxSizeInBytes = maxSizeInMB * 1024 * 1024;
 
     const validFiles: UploadedFile[] = [];
     const errors: string[] = [];
-    const heicConversions: Promise<void>[] = [];
 
-    Array.from(selectedFiles).forEach(file => {
-      // Check file format (including HEIC)
-      if (!supportedFormats.includes(file.type) && !file.name.toLowerCase().endsWith('.heic')) {
-        errors.push(`${file.name}: Unsupported format. Please use JPG, PNG, GIF, WEBP, or HEIC.`);
-        return;
-      }
+    // Process files sequentially to handle async HEIC conversion properly
+    for (const file of Array.from(selectedFiles)) {
+      try {
+        // Check if it's a HEIC file (by extension since MIME type is unreliable)
+        const isHeicFile = file.name.toLowerCase().endsWith('.heic');
+        
+        // Check file format
+        if (!supportedFormats.includes(file.type) && !isHeicFile) {
+          errors.push(`${file.name}: Unsupported format. Please use JPG, PNG, GIF, WEBP, or HEIC.`);
+          continue;
+        }
 
-      // Check file size
-      if (file.size > maxSizeInBytes) {
-        errors.push(`${file.name}: File too large. Maximum size is ${maxSizeInMB}MB.`);
-        return;
-      }
+        // Check file size
+        if (file.size > maxSizeInBytes) {
+          errors.push(`${file.name}: File too large. Maximum size is ${maxSizeInMB}MB.`);
+          continue;
+        }
 
-      // Handle HEIC conversion
-      if (file.type === 'image/heic' || file.name.toLowerCase().endsWith('.heic')) {
-        const conversionPromise = convertHeicToJpeg(file).then(convertedFile => {
-          const uploadedFile: UploadedFile = {
+        // Handle HEIC conversion
+        if (isHeicFile) {
+          try {
+            toast.info(`Converting ${file.name} from HEIC...`, { duration: 2000 });
+            const convertedFile = await convertHeicToJpeg(file);
+            
+            validFiles.push({
+              id: Math.random().toString(36).substr(2, 9),
+              file: convertedFile,
+              preview: URL.createObjectURL(convertedFile),
+              uploading: false,
+              progress: 0
+            });
+            
+            toast.success(`✓ Converted ${file.name} to JPEG`);
+          } catch (conversionError) {
+            console.error('HEIC conversion error:', conversionError);
+            errors.push(`${file.name}: Failed to convert from HEIC format`);
+          }
+        } else {
+          // Regular supported file
+          validFiles.push({
             id: Math.random().toString(36).substr(2, 9),
-            file: convertedFile,
-            preview: URL.createObjectURL(convertedFile),
+            file,
+            preview: URL.createObjectURL(file),
             uploading: false,
             progress: 0
-          };
-          validFiles.push(uploadedFile);
-          toast.success(`Converted ${file.name} from HEIC to JPEG`);
-        }).catch(error => {
-          errors.push(`${file.name}: ${error.message}`);
-        });
-        heicConversions.push(conversionPromise);
-      } else {
-        // Regular supported file
-        validFiles.push({
-          id: Math.random().toString(36).substr(2, 9),
-          file,
-          preview: URL.createObjectURL(file),
-          uploading: false,
-          progress: 0
-        });
+          });
+        }
+      } catch (error) {
+        console.error('File processing error:', error);
+        errors.push(`${file.name}: Processing failed`);
       }
-    });
-
-    // Wait for all HEIC conversions to complete
-    if (heicConversions.length > 0) {
-      toast.info(`Converting ${heicConversions.length} HEIC file(s)...`, { duration: 2000 });
-      await Promise.all(heicConversions);
     }
 
     // Show errors if any
