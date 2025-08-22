@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Loader2 } from 'lucide-react';
 
 interface LoadingMessage {
@@ -29,6 +29,8 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
 }) => {
   const [messages, setMessages] = useState<LoadingMessage[]>([]);
   const [messageCounter, setMessageCounter] = useState(0);
+  const messageQueueRef = useRef<Array<{text: string; type: LoadingMessage['type']; delay: number}>>([]);
+  const processingQueueRef = useRef(false);
 
   const tips = [
     "Did you know? It makes my job easier if you keep photos of the same room in order",
@@ -38,32 +40,53 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
     "Tip: Take photos from different angles for better item detection"
   ];
 
-  const addMessage = (text: string, type: LoadingMessage['type'] = 'info') => {
-    const newMessage: LoadingMessage = {
-      id: `msg-${messageCounter}`,
-      text,
-      type,
-      timestamp: Date.now()
-    };
+  const addMessageToQueue = (text: string, type: LoadingMessage['type'] = 'info', delay: number = 1500) => {
+    messageQueueRef.current.push({ text, type, delay });
+    processMessageQueue();
+  };
+
+  const processMessageQueue = async () => {
+    if (processingQueueRef.current || messageQueueRef.current.length === 0) return;
     
-    setMessages(prev => [...prev, newMessage]);
-    setMessageCounter(prev => prev + 1);
+    processingQueueRef.current = true;
     
-    // Remove old messages after 5 seconds to prevent overflow
-    setTimeout(() => {
-      setMessages(prev => prev.filter(msg => msg.id !== newMessage.id));
-    }, 8000);
+    while (messageQueueRef.current.length > 0) {
+      const messageData = messageQueueRef.current.shift();
+      if (messageData) {
+        await new Promise(resolve => setTimeout(resolve, messageData.delay));
+        
+        const newMessage: LoadingMessage = {
+          id: `msg-${messageCounter}`,
+          text: messageData.text,
+          type: messageData.type,
+          timestamp: Date.now()
+        };
+        
+        setMessages(prev => {
+          const updated = [...prev, newMessage];
+          // Keep only the last 4 messages
+          return updated.slice(-4);
+        });
+        
+        setMessageCounter(prev => prev + 1);
+      }
+    }
+    
+    processingQueueRef.current = false;
   };
 
   useEffect(() => {
     if (!isVisible) {
       setMessages([]);
       setMessageCounter(0);
+      messageQueueRef.current = [];
+      processingQueueRef.current = false;
       return;
     }
 
-    // Initial setup message
-    addMessage("Scanning photos to determine home layout and rooms");
+    // Clear any existing queue and start fresh
+    messageQueueRef.current = [];
+    addMessageToQueue("Scanning photos to determine home layout and rooms", 'info', 0);
 
   }, [isVisible]);
 
@@ -89,42 +112,29 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
         roomTypes.others && `${roomTypes.others} other room${roomTypes.others > 1 ? 's' : ''}`
       ].filter(Boolean).join(', ');
 
-      setTimeout(() => {
-        addMessage(`Found ${roomsDetected.length} rooms, including ${roomDescription}`, 'success');
-      }, 1500);
-
-      setTimeout(() => {
-        addMessage("I will now analyse each photo individually and extract its content and match it to each room");
-      }, 3000);
-
-      setTimeout(() => {
-        addMessage("Please be patient, this can take up to 10 seconds per photo");
-      }, 4500);
-
-      setTimeout(() => {
-        addMessage(tips[0]);
-      }, 6000);
+      addMessageToQueue(`Found ${roomsDetected.length} rooms, including ${roomDescription}`, 'success', 2000);
+      addMessageToQueue("I will now analyse each photo individually and extract its content and match it to each room", 'info', 2000);
+      addMessageToQueue("Please be patient, this can take up to 10 seconds per photo", 'info', 1500);
+      addMessageToQueue(tips[0], 'info', 1500);
     }
   }, [currentStep, roomsDetected]);
 
   useEffect(() => {
     if (currentStep === 'item-analysis' && progress.total > 0 && currentImage > 0) {
       const roomText = currentRoom ? ` from ${currentRoom}` : '';
-      addMessage(`Analyzing picture ${currentImage}/${progress.total}${roomText}`, 'progress');
+      addMessageToQueue(`Analyzing picture ${currentImage}/${progress.total}${roomText}`, 'progress', 500);
       
       if (itemsFound > 0) {
-        setTimeout(() => {
-          addMessage(`Found ${itemsFound} items`, 'success');
-        }, 2000);
+        addMessageToQueue(`Found ${itemsFound} items`, 'success', 1500);
       }
 
       // Add tips occasionally
       if (currentImage === 2) {
-        setTimeout(() => addMessage(tips[1]), 3000);
+        addMessageToQueue(tips[1], 'info', 1000);
       } else if (currentImage === Math.floor(progress.total / 2)) {
-        setTimeout(() => addMessage(tips[2]), 3000);
+        addMessageToQueue(tips[2], 'info', 1000);
       } else if (currentImage === progress.total - 1) {
-        setTimeout(() => addMessage(tips[Math.floor(Math.random() * tips.length)]), 3000);
+        addMessageToQueue(tips[Math.floor(Math.random() * tips.length)], 'info', 1000);
       }
     }
   }, [currentImage, progress, currentRoom, itemsFound]);
