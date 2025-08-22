@@ -51,14 +51,14 @@ serve(async (req) => {
         messages: [
           { 
             role: 'system', 
-            content: 'You are an educational content writer. Create engaging, informative content that teaches interesting facts. Write exactly 2-3 paragraphs, each separated by double line breaks. Keep it engaging and educational but concise enough for a loading screen. Do not use any special formatting or headers.' 
+            content: 'You are a fun facts writer. Create short, engaging content with surprising and interesting facts. Write exactly 4-6 short sentences with fun facts. Use simple, easy-to-read language. Each fact should be surprising or little-known. Do not use any special formatting or headers.' 
           },
           { 
             role: 'user', 
-            content: `Write an interesting and educational piece about ${topic}. Make it engaging and teach me something fascinating I might not know.` 
+            content: `Write 4-6 fun facts about ${topic}. Make each fact surprising and easy to understand. Use simple words and short sentences.` 
           }
         ],
-        max_tokens: 400,
+        max_tokens: 200,
         temperature: 0.7,
       }),
     });

@@ -24,6 +24,7 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
   const [displayedText, setDisplayedText] = useState('');
   const [currentCharIndex, setCurrentCharIndex] = useState(0);
   const [contentToDisplay, setContentToDisplay] = useState('');
+  const [topicTitle, setTopicTitle] = useState('');
   const [isLoadingContent, setIsLoadingContent] = useState(false);
   const [contentReady, setContentReady] = useState(false);
   const typewriterIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -50,12 +51,17 @@ The Great War officially ended on November 11, 1918, with the signing of the Arm
         
         if (data.content) {
           setContentToDisplay(data.content);
+          // Extract topic name for title
+          const topicName = data.topic?.split(' ').slice(-3).join(' ') || 'Today\'s Topic';
+          setTopicTitle(topicName);
         } else {
           setContentToDisplay(fallbackText);
+          setTopicTitle('World War I');
         }
       } catch (error) {
         console.error('Failed to fetch dynamic content:', error);
         setContentToDisplay(fallbackText);
+        setTopicTitle('World War I');
       } finally {
         setIsLoadingContent(false);
         setContentReady(true);
@@ -73,6 +79,7 @@ The Great War officially ended on November 11, 1918, with the signing of the Arm
       setCurrentCharIndex(0);
       setContentReady(false);
       setIsLoadingContent(false);
+      setTopicTitle('');
       if (typewriterIntervalRef.current) {
         clearInterval(typewriterIntervalRef.current);
         typewriterIntervalRef.current = null;
@@ -100,7 +107,7 @@ The Great War officially ended on November 11, 1918, with the signing of the Arm
           return 0;
         }
       });
-    }, 30); // Typing speed
+    }, 60); // Slower typing speed
 
     return () => {
       if (typewriterIntervalRef.current) {
@@ -169,9 +176,18 @@ The Great War officially ended on November 11, 1918, with the signing of the Arm
               </div>
             </div>
           ) : (
-            <div className="text-sm leading-relaxed text-foreground whitespace-pre-wrap">
-              {displayedText}
-              {contentReady && <span className="animate-pulse">|</span>}
+            <div>
+              {topicTitle && (
+                <div className="mb-3 pb-2 border-b border-border">
+                  <h3 className="text-sm font-medium text-primary capitalize">
+                    Today's Content: {topicTitle}
+                  </h3>
+                </div>
+              )}
+              <div className="text-sm leading-relaxed text-foreground whitespace-pre-wrap">
+                {displayedText}
+                {contentReady && <span className="animate-pulse">|</span>}
+              </div>
             </div>
           )}
         </div>
