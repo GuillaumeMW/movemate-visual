@@ -1,13 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Loader2 } from 'lucide-react';
 
-interface LoadingMessage {
-  id: string;
-  text: string;
-  type: 'info' | 'success' | 'progress';
-  timestamp: number;
-}
-
 interface LoadingOverlayProps {
   isVisible: boolean;
   currentStep: string;
@@ -27,117 +20,66 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
   currentRoom = '',
   itemsFound = 0
 }) => {
-  const [messages, setMessages] = useState<LoadingMessage[]>([]);
-  const [messageCounter, setMessageCounter] = useState(0);
-  const messageQueueRef = useRef<Array<{text: string; type: LoadingMessage['type']; delay: number}>>([]);
-  const processingQueueRef = useRef(false);
+  const [displayedText, setDisplayedText] = useState('');
+  const [currentCharIndex, setCurrentCharIndex] = useState(0);
+  const typewriterIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  const tips = [
-    "Did you know? It makes my job easier if you keep photos of the same room in order",
-    "Did you know? I will try and group smaller items into boxes",
-    "Did you know? Please review carefully. As an AI I can miss items or count them twice",
-    "Tip: Better lighting in photos helps me identify items more accurately",
-    "Tip: Take photos from different angles for better item detection"
-  ];
+  const fullText = `World War I, known as the Great War, began in 1914 and forever changed the course of human history. The conflict started with the assassination of Archduke Franz Ferdinand of Austria-Hungary in Sarajevo on June 28, 1914. This single event triggered a complex web of alliances that pulled major European powers into what would become the first global industrial war. The Central Powers, consisting primarily of Germany, Austria-Hungary, and the Ottoman Empire, faced off against the Allied Powers, including France, Britain, Russia, and later the United States.
 
-  const addMessageToQueue = (text: string, type: LoadingMessage['type'] = 'info', delay: number = 1500) => {
-    messageQueueRef.current.push({ text, type, delay });
-    processMessageQueue();
-  };
+The war introduced unprecedented technological horrors that transformed the nature of combat. Poison gas, first used by German forces at the Second Battle of Ypres in 1915, created a new dimension of terror on the battlefield. Machine guns, barbed wire, and artillery created deadly killing fields that led to the infamous trench warfare system stretching from the English Channel to the Swiss border. These innovations in warfare technology resulted in casualties on a scale never before seen in human history, with entire generations of young men lost to the conflict.
 
-  const processMessageQueue = async () => {
-    if (processingQueueRef.current || messageQueueRef.current.length === 0) return;
-    
-    processingQueueRef.current = true;
-    
-    while (messageQueueRef.current.length > 0) {
-      const messageData = messageQueueRef.current.shift();
-      if (messageData) {
-        await new Promise(resolve => setTimeout(resolve, messageData.delay));
-        
-        const newMessage: LoadingMessage = {
-          id: `msg-${messageCounter}`,
-          text: messageData.text,
-          type: messageData.type,
-          timestamp: Date.now()
-        };
-        
-        setMessages(prev => {
-          const updated = [...prev, newMessage];
-          // Keep only the last 4 messages
-          return updated.slice(-4);
-        });
-        
-        setMessageCounter(prev => prev + 1);
-      }
-    }
-    
-    processingQueueRef.current = false;
-  };
+The Great War officially ended on November 11, 1918, with the signing of the Armistice at Compiègne. However, its consequences would echo throughout the 20th century and beyond. The Treaty of Versailles imposed harsh reparations on Germany, contributing to economic instability that would later facilitate the rise of extremist movements. The war also led to the collapse of four major empires: the German, Austro-Hungarian, Russian, and Ottoman empires, fundamentally redrawing the map of Europe and the Middle East and setting the stage for future conflicts.`;
 
   useEffect(() => {
     if (!isVisible) {
-      setMessages([]);
-      setMessageCounter(0);
-      messageQueueRef.current = [];
-      processingQueueRef.current = false;
+      setDisplayedText('');
+      setCurrentCharIndex(0);
+      if (typewriterIntervalRef.current) {
+        clearInterval(typewriterIntervalRef.current);
+        typewriterIntervalRef.current = null;
+      }
       return;
     }
 
-    // Clear any existing queue and start fresh
-    messageQueueRef.current = [];
-    addMessageToQueue("Scanning photos to determine home layout and rooms", 'info', 0);
+    // Start typewriter effect
+    if (typewriterIntervalRef.current) {
+      clearInterval(typewriterIntervalRef.current);
+    }
 
+    typewriterIntervalRef.current = setInterval(() => {
+      setCurrentCharIndex(prevIndex => {
+        if (prevIndex < fullText.length) {
+          const newIndex = prevIndex + 1;
+          setDisplayedText(fullText.slice(0, newIndex));
+          return newIndex;
+        } else {
+          // Reset and start over
+          setDisplayedText('');
+          return 0;
+        }
+      });
+    }, 30); // Typing speed
+
+    return () => {
+      if (typewriterIntervalRef.current) {
+        clearInterval(typewriterIntervalRef.current);
+      }
+    };
   }, [isVisible]);
 
+  // Auto-scroll to keep cursor visible
   useEffect(() => {
-    if (currentStep === 'room-detection' && roomsDetected.length > 0) {
-      const roomTypes = roomsDetected.reduce((acc, room) => {
-        const type = room.toLowerCase();
-        if (type.includes('bedroom')) acc.bedrooms = (acc.bedrooms || 0) + 1;
-        else if (type.includes('kitchen')) acc.kitchen = (acc.kitchen || 0) + 1;
-        else if (type.includes('bathroom')) acc.bathrooms = (acc.bathrooms || 0) + 1;
-        else if (type.includes('living') || type.includes('room')) acc.livingRooms = (acc.livingRooms || 0) + 1;
-        else if (type.includes('balcony')) acc.balconies = (acc.balconies || 0) + 1;
-        else acc.others = (acc.others || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
-
-      const roomDescription = [
-        roomTypes.bedrooms && `${roomTypes.bedrooms} bedroom${roomTypes.bedrooms > 1 ? 's' : ''}`,
-        roomTypes.kitchen && `${roomTypes.kitchen} kitchen`,
-        roomTypes.bathrooms && `${roomTypes.bathrooms} bathroom${roomTypes.bathrooms > 1 ? 's' : ''}`,
-        roomTypes.livingRooms && `${roomTypes.livingRooms} living room${roomTypes.livingRooms > 1 ? 's' : ''}`,
-        roomTypes.balconies && `${roomTypes.balconies} balcony${roomTypes.balconies > 1 ? 'ies' : ''}`,
-        roomTypes.others && `${roomTypes.others} other room${roomTypes.others > 1 ? 's' : ''}`
-      ].filter(Boolean).join(', ');
-
-      addMessageToQueue(`Found ${roomsDetected.length} rooms, including ${roomDescription}`, 'success', 2000);
-      addMessageToQueue("I will now analyse each photo individually and extract its content and match it to each room", 'info', 2000);
-      addMessageToQueue("Please be patient, this can take up to 10 seconds per photo", 'info', 1500);
-      addMessageToQueue(tips[0], 'info', 1500);
-    }
-  }, [currentStep, roomsDetected]);
-
-  useEffect(() => {
-    if (currentStep === 'item-analysis' && progress.total > 0 && currentImage > 0) {
-      const roomText = currentRoom ? ` from ${currentRoom}` : '';
-      addMessageToQueue(`Analyzing picture ${currentImage}/${progress.total}${roomText}`, 'progress', 500);
+    if (scrollContainerRef.current) {
+      const container = scrollContainerRef.current;
+      const shouldScroll = container.scrollHeight > container.clientHeight;
       
-      if (itemsFound > 0) {
-        addMessageToQueue(`Found ${itemsFound} items`, 'success', 1500);
-      }
-
-      // Add tips occasionally
-      if (currentImage === 2) {
-        addMessageToQueue(tips[1], 'info', 1000);
-      } else if (currentImage === Math.floor(progress.total / 2)) {
-        addMessageToQueue(tips[2], 'info', 1000);
-      } else if (currentImage === progress.total - 1) {
-        addMessageToQueue(tips[Math.floor(Math.random() * tips.length)], 'info', 1000);
+      if (shouldScroll) {
+        // Scroll to bottom to show the typing cursor
+        container.scrollTop = container.scrollHeight - container.clientHeight;
       }
     }
-  }, [currentImage, progress, currentRoom, itemsFound]);
+  }, [displayedText]);
 
   if (!isVisible) return null;
 
@@ -173,48 +115,14 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
           </p>
         </div>
 
-        {/* Animated Messages */}
-        <div className="relative h-64 overflow-hidden">
-          <div className="space-y-3">
-            {messages.slice(-6).map((message, index) => (
-              <div
-                key={message.id}
-                className={`transform transition-all duration-500 ease-out ${
-                  index === messages.slice(-6).length - 1
-                    ? 'animate-fade-in translate-y-0 opacity-100'
-                    : 'opacity-75'
-                }`}
-                style={{
-                  transform: `translateY(${index * 40}px)`,
-                  animationDelay: `${index * 100}ms`
-                }}
-              >
-                <div className={`flex items-start gap-3 p-3 rounded-lg ${
-                  message.type === 'success' 
-                    ? 'bg-green-50 border border-green-200 dark:bg-green-950/20 dark:border-green-800' 
-                    : message.type === 'progress'
-                    ? 'bg-blue-50 border border-blue-200 dark:bg-blue-950/20 dark:border-blue-800'
-                    : 'bg-muted border border-border'
-                }`}>
-                  <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${
-                    message.type === 'success' 
-                      ? 'bg-green-500' 
-                      : message.type === 'progress'
-                      ? 'bg-blue-500'
-                      : 'bg-muted-foreground'
-                  }`} />
-                  <p className={`text-sm leading-relaxed ${
-                    message.type === 'success'
-                      ? 'text-green-800 dark:text-green-200'
-                      : message.type === 'progress'
-                      ? 'text-blue-800 dark:text-blue-200'
-                      : 'text-foreground'
-                  }`}>
-                    {message.text}
-                  </p>
-                </div>
-              </div>
-            ))}
+        {/* Typewriter Text */}
+        <div 
+          ref={scrollContainerRef}
+          className="relative h-64 overflow-hidden bg-muted/30 border border-border rounded-lg p-4"
+        >
+          <div className="text-sm leading-relaxed text-foreground whitespace-pre-wrap">
+            {displayedText}
+            <span className="animate-pulse">|</span>
           </div>
         </div>
 
