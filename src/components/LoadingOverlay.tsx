@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Loader2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface LoadingOverlayProps {
   isVisible: boolean;
@@ -22,25 +23,65 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
 }) => {
   const [displayedText, setDisplayedText] = useState('');
   const [currentCharIndex, setCurrentCharIndex] = useState(0);
+  const [contentToDisplay, setContentToDisplay] = useState('');
+  const [isLoadingContent, setIsLoadingContent] = useState(false);
+  const [contentReady, setContentReady] = useState(false);
   const typewriterIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  const fullText = `World War I, known as the Great War, began in 1914 and forever changed the course of human history. The conflict started with the assassination of Archduke Franz Ferdinand of Austria-Hungary in Sarajevo on June 28, 1914. This single event triggered a complex web of alliances that pulled major European powers into what would become the first global industrial war. The Central Powers, consisting primarily of Germany, Austria-Hungary, and the Ottoman Empire, faced off against the Allied Powers, including France, Britain, Russia, and later the United States.
+  // Fallback content
+  const fallbackText = `World War I, known as the Great War, began in 1914 and forever changed the course of human history. The conflict started with the assassination of Archduke Franz Ferdinand of Austria-Hungary in Sarajevo on June 28, 1914. This single event triggered a complex web of alliances that pulled major European powers into what would become the first global industrial war. The Central Powers, consisting primarily of Germany, Austria-Hungary, and the Ottoman Empire, faced off against the Allied Powers, including France, Britain, Russia, and later the United States.
 
 The war introduced unprecedented technological horrors that transformed the nature of combat. Poison gas, first used by German forces at the Second Battle of Ypres in 1915, created a new dimension of terror on the battlefield. Machine guns, barbed wire, and artillery created deadly killing fields that led to the infamous trench warfare system stretching from the English Channel to the Swiss border. These innovations in warfare technology resulted in casualties on a scale never before seen in human history, with entire generations of young men lost to the conflict.
 
 The Great War officially ended on November 11, 1918, with the signing of the Armistice at Compiègne. However, its consequences would echo throughout the 20th century and beyond. The Treaty of Versailles imposed harsh reparations on Germany, contributing to economic instability that would later facilitate the rise of extremist movements. The war also led to the collapse of four major empires: the German, Austro-Hungarian, Russian, and Ottoman empires, fundamentally redrawing the map of Europe and the Middle East and setting the stage for future conflicts.`;
 
+  // Fetch dynamic content when overlay becomes visible
+  useEffect(() => {
+    if (!isVisible || contentReady) return;
+
+    const fetchContent = async () => {
+      setIsLoadingContent(true);
+      
+      try {
+        const { data, error } = await supabase.functions.invoke('generate-loading-content');
+        
+        if (error) throw error;
+        
+        if (data.content) {
+          setContentToDisplay(data.content);
+        } else {
+          setContentToDisplay(fallbackText);
+        }
+      } catch (error) {
+        console.error('Failed to fetch dynamic content:', error);
+        setContentToDisplay(fallbackText);
+      } finally {
+        setIsLoadingContent(false);
+        setContentReady(true);
+      }
+    };
+
+    // Small delay before fetching content
+    const timer = setTimeout(fetchContent, 1000);
+    return () => clearTimeout(timer);
+  }, [isVisible, contentReady]);
+
   useEffect(() => {
     if (!isVisible) {
       setDisplayedText('');
       setCurrentCharIndex(0);
+      setContentReady(false);
+      setIsLoadingContent(false);
       if (typewriterIntervalRef.current) {
         clearInterval(typewriterIntervalRef.current);
         typewriterIntervalRef.current = null;
       }
       return;
     }
+
+    // Only start typewriter effect when content is ready
+    if (!contentReady || !contentToDisplay) return;
 
     // Start typewriter effect
     if (typewriterIntervalRef.current) {
@@ -49,9 +90,9 @@ The Great War officially ended on November 11, 1918, with the signing of the Arm
 
     typewriterIntervalRef.current = setInterval(() => {
       setCurrentCharIndex(prevIndex => {
-        if (prevIndex < fullText.length) {
+        if (prevIndex < contentToDisplay.length) {
           const newIndex = prevIndex + 1;
-          setDisplayedText(fullText.slice(0, newIndex));
+          setDisplayedText(contentToDisplay.slice(0, newIndex));
           return newIndex;
         } else {
           // Reset and start over
@@ -66,7 +107,7 @@ The Great War officially ended on November 11, 1918, with the signing of the Arm
         clearInterval(typewriterIntervalRef.current);
       }
     };
-  }, [isVisible]);
+  }, [isVisible, contentReady, contentToDisplay]);
 
   // Auto-scroll to keep cursor visible
   useEffect(() => {
@@ -120,10 +161,19 @@ The Great War officially ended on November 11, 1918, with the signing of the Arm
           ref={scrollContainerRef}
           className="relative h-64 overflow-hidden bg-muted/30 border border-border rounded-lg p-4"
         >
-          <div className="text-sm leading-relaxed text-foreground whitespace-pre-wrap">
-            {displayedText}
-            <span className="animate-pulse">|</span>
-          </div>
+          {isLoadingContent ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span className="text-sm">Preparing today's content...</span>
+              </div>
+            </div>
+          ) : (
+            <div className="text-sm leading-relaxed text-foreground whitespace-pre-wrap">
+              {displayedText}
+              {contentReady && <span className="animate-pulse">|</span>}
+            </div>
+          )}
         </div>
 
         {/* Footer */}
