@@ -51,14 +51,14 @@ serve(async (req) => {
         messages: [
           { 
             role: 'system', 
-            content: 'You are a fun facts writer. Create short, engaging content with surprising and interesting facts. Write exactly 4-6 short sentences with fun facts. Use simple, easy-to-read language. Each fact should be surprising or little-known. Do not use any special formatting or headers.' 
+            content: 'You are a fun facts writer. Create engaging content with surprising and interesting facts. Write compelling narratives that keep readers hooked. Use simple, easy-to-read language. Each fact should be surprising or little-known. Do not use any special formatting or headers.' 
           },
           { 
             role: 'user', 
-            content: `Write 4-6 fun facts about ${topic}. Make each fact surprising and easy to understand. Use simple words and short sentences.` 
+            content: `Write a 100 to 500 word fun fact about ${topic}. Make it interesting. Keep readers wanting to reach more.` 
           }
         ],
-        max_tokens: 200,
+        max_tokens: 700,
         temperature: 0.7,
       }),
     });
