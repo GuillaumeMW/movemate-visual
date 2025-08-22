@@ -7,6 +7,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import LoadingOverlay from "@/components/LoadingOverlay";
 
 interface UploadedFile {
   id: string;
@@ -25,6 +26,13 @@ const UploadPage = () => {
   const [searchParams] = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+  
+  // Loading overlay state
+  const [currentStep, setCurrentStep] = useState('');
+  const [roomsDetected, setRoomsDetected] = useState<string[]>([]);
+  const [currentImage, setCurrentImage] = useState(0);
+  const [currentRoom, setCurrentRoom] = useState('');
+  const [itemsFound, setItemsFound] = useState(0);
 
   useEffect(() => {
     const sessionId = searchParams.get('session');
@@ -201,6 +209,7 @@ const UploadPage = () => {
       // TWO-PASS ANALYSIS SYSTEM
       
       // PASS 1: Room Detection
+      setCurrentStep('room-detection');
       toast.info("Step 1: Detecting rooms across all images...", { duration: 3000 });
       
       const allBase64Images = await Promise.all(
@@ -223,9 +232,11 @@ const UploadPage = () => {
       const detectedRooms = roomData?.rooms_detected || [];
       
       console.log('Room detection results:', { roomMappings, detectedRooms });
+      setRoomsDetected(detectedRooms);
       toast.success(`✓ Detected ${detectedRooms.length} rooms: ${detectedRooms.join(', ')}`, { duration: 4000 });
       
       // PASS 2: Item Analysis with Room Context
+      setCurrentStep('item-analysis');
       toast.info("Step 2: Analyzing items with room context...", { duration: 2000 });
       setAnalysisProgress({ current: 0, total: files.length });
       let allItems: any[] = [];
@@ -233,6 +244,11 @@ const UploadPage = () => {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         setAnalysisProgress({ current: i + 1, total: files.length });
+        setCurrentImage(i + 1);
+        
+        // Get room for this image
+        const imageRoom = roomMappings[i + 1] || 'unknown room';
+        setCurrentRoom(imageRoom);
         
         toast.info(`Analyzing image ${i + 1} of ${files.length}...`, { 
           duration: 1000,
@@ -262,10 +278,12 @@ const UploadPage = () => {
 
           if (data.items && data.items.length > 0) {
             allItems.push(...data.items);
+            setItemsFound(data.items.length);
             toast.success(`✓ Found ${data.items.length} items in image ${i + 1}`, { 
               duration: 2000 
             });
           } else {
+            setItemsFound(0);
             toast.info(`No items found in image ${i + 1}`, { duration: 1500 });
           }
         } catch (imageError) {
@@ -327,168 +345,185 @@ const UploadPage = () => {
     } finally {
       setIsAnalyzing(false);
       setAnalysisProgress({ current: 0, total: 0 });
+      setCurrentStep('');
+      setCurrentImage(0);
+      setCurrentRoom('');
+      setItemsFound(0);
+      setRoomsDetected([]);
     }
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <Link to="/start">
-              <Button variant="ghost" size="sm">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back
-              </Button>
-            </Link>
-            <h1 className="text-2xl font-bold">Upload Photos</h1>
-          </div>
-          {currentSession && (
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => navigate('/upload')}
-            >
-              New Inventory
-            </Button>
-          )}
-        </div>
-
-        <div className="max-w-4xl mx-auto">
-          {/* Session Info */}
-          {currentSession && (
-            <div className="mb-6 p-4 bg-primary/10 border border-primary/20 rounded-lg">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-semibold text-primary">Continuing Session</h3>
-                  <p className="text-sm text-muted-foreground">{currentSession.name}</p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => navigate(`/review?session=${currentSession.id}`)}
-                >
-                  View Existing Items
+    <>
+      <LoadingOverlay
+        isVisible={isAnalyzing}
+        currentStep={currentStep}
+        progress={analysisProgress}
+        roomsDetected={roomsDetected}
+        currentImage={currentImage}
+        currentRoom={currentRoom}
+        itemsFound={itemsFound}
+      />
+      
+      <div className="min-h-screen bg-background">
+        <div className="container mx-auto px-4 py-8">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-4">
+              <Link to="/start">
+                <Button variant="ghost" size="sm">
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Back
                 </Button>
-              </div>
+              </Link>
+              <h1 className="text-2xl font-bold">Upload Photos</h1>
             </div>
-          )}
-
-          {/* Upload Area */}
-          <Card className="mb-8">
-            <CardHeader>
-              <CardTitle>Add Your Photos</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div
-                className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                  isDragging ? 'border-primary bg-primary/5' : 'border-muted-foreground/25'
-                }`}
-                onDrop={handleDrop}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
+            {currentSession && (
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => navigate('/upload')}
               >
-                <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                <h3 className="text-lg font-semibold mb-2">Drag and drop your photos here</h3>
-                <p className="text-muted-foreground mb-4">
-                  Or click to select files. Supports JPG, PNG, GIF, WEBP (max 10MB each).
-                </p>
-                <div className="flex gap-4 justify-center">
+                New Inventory
+              </Button>
+            )}
+          </div>
+
+          <div className="max-w-4xl mx-auto">
+            {/* Session Info */}
+            {currentSession && (
+              <div className="mb-6 p-4 bg-primary/10 border border-primary/20 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold text-primary">Continuing Session</h3>
+                    <p className="text-sm text-muted-foreground">{currentSession.name}</p>
+                  </div>
                   <Button
-                    onClick={() => fileInputRef.current?.click()}
                     variant="outline"
+                    size="sm"
+                    onClick={() => navigate(`/review?session=${currentSession.id}`)}
                   >
-                    <Upload className="w-4 h-4 mr-2" />
-                    Choose Files
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      // For MVP, we'll show a toast about camera functionality
-                      toast.info("Camera capture coming soon! Please use file upload for now.");
-                    }}
-                    variant="outline"
-                  >
-                    <Camera className="w-4 h-4 mr-2" />
-                    Take Photo
+                    View Existing Items
                   </Button>
                 </div>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  multiple
-                  accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
-                  className="hidden"
-                  onChange={async (e) => await handleFileSelect(e.target.files)}
-                />
               </div>
-            </CardContent>
-          </Card>
+            )}
 
-          {/* File List */}
-          {files.length > 0 && (
+            {/* Upload Area */}
             <Card className="mb-8">
               <CardHeader>
-                <CardTitle>Uploaded Photos ({files.length})</CardTitle>
+                <CardTitle>Add Your Photos</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {files.map((file) => (
-                    <div key={file.id} className="relative group">
-                      <img
-                        src={file.preview}
-                        alt={file.file.name}
-                        className="w-full h-32 object-cover rounded-lg border"
-                      />
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={() => removeFile(file.id)}
-                      >
-                        <X className="w-3 h-3" />
-                      </Button>
-                      {file.uploading && (
-                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-lg">
-                          <div className="text-white text-center">
-                            <Progress value={file.progress} className="mb-2" />
-                            <span className="text-sm">{file.progress}%</span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                <div
+                  className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                    isDragging ? 'border-primary bg-primary/5' : 'border-muted-foreground/25'
+                  }`}
+                  onDrop={handleDrop}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                >
+                  <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                  <h3 className="text-lg font-semibold mb-2">Drag and drop your photos here</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Or click to select files. Supports JPG, PNG, GIF, WEBP (max 10MB each).
+                  </p>
+                  <div className="flex gap-4 justify-center">
+                    <Button
+                      onClick={() => fileInputRef.current?.click()}
+                      variant="outline"
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      Choose Files
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        // For MVP, we'll show a toast about camera functionality
+                        toast.info("Camera capture coming soon! Please use file upload for now.");
+                      }}
+                      variant="outline"
+                    >
+                      <Camera className="w-4 h-4 mr-2" />
+                      Take Photo
+                    </Button>
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                    className="hidden"
+                    onChange={async (e) => await handleFileSelect(e.target.files)}
+                  />
                 </div>
               </CardContent>
             </Card>
-          )}
 
-          {/* Actions */}
-          <div className="flex justify-between">
-            <Button variant="outline" asChild>
-              <Link to="/manual">Add Manual Items</Link>
-            </Button>
-            <Button 
-              onClick={handleAnalyze}
-              disabled={files.length === 0 || isAnalyzing}
-              size="lg"
-            >
-              {isAnalyzing ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  {analysisProgress.total > 0 ? 
-                    `Analyzing ${analysisProgress.current}/${analysisProgress.total}...` : 
-                    'Analyzing...'
-                  }
-                </>
-              ) : (
-                `Analyze Items (${files.length} photos)`
-              )}
-            </Button>
+            {/* File List */}
+            {files.length > 0 && (
+              <Card className="mb-8">
+                <CardHeader>
+                  <CardTitle>Uploaded Photos ({files.length})</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {files.map((file) => (
+                      <div key={file.id} className="relative group">
+                        <img
+                          src={file.preview}
+                          alt={file.file.name}
+                          className="w-full h-32 object-cover rounded-lg border"
+                        />
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => removeFile(file.id)}
+                        >
+                          <X className="w-3 h-3" />
+                        </Button>
+                        {file.uploading && (
+                          <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-lg">
+                            <div className="text-white text-center">
+                              <Progress value={file.progress} className="mb-2" />
+                              <span className="text-sm">{file.progress}%</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Actions */}
+            <div className="flex justify-between">
+              <Button variant="outline" asChild>
+                <Link to="/manual">Add Manual Items</Link>
+              </Button>
+              <Button 
+                onClick={handleAnalyze}
+                disabled={files.length === 0 || isAnalyzing}
+                size="lg"
+              >
+                {isAnalyzing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    {analysisProgress.total > 0 ? 
+                      `Analyzing ${analysisProgress.current}/${analysisProgress.total}...` : 
+                      'Analyzing...'
+                    }
+                  </>
+                ) : (
+                  `Analyze Items (${files.length} photos)`
+                )}
+              </Button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 
