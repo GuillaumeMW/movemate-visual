@@ -360,126 +360,204 @@ export default function Review() {
           </CardContent>
         </Card>
 
-        {/* Items List */}
-        <Card className="mb-8">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Inventory Items</CardTitle>
-              <Button onClick={() => setShowAddForm(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Item
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="border-b">
-                  <tr className="text-left">
-                    <th className="p-4 w-20">Going</th>
-                    <th className="p-4">Item Name</th>
-                    <th className="p-4">Image #</th>
-                    <th className="p-4">Quantity</th>
-                    <th className="p-4">Volume (cu ft)</th>
-                    <th className="p-4">Weight (lbs)</th>
-                    <th className="p-4">Room</th>
-                    <th className="p-4">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map((item) => (
-                    <tr key={item.id} className="border-b hover:bg-muted/50">
-                      <td className="p-4">
-                        <div className="flex flex-col items-center gap-1">
-                          <Switch
-                            checked={item.is_going !== false}
-                            onCheckedChange={(checked) => updateItem(item.id, { is_going: checked })}
-                          />
-                          <span className="text-xs text-muted-foreground">
-                            {item.is_going !== false ? 'Going' : 'Not going'}
-                          </span>
-                        </div>
-                      </td>
-                       <td className="p-4">
-                         <div className="flex items-center gap-3">
-                           <div>
-                              {editingItem === item.id ? (
-                                <Input
-                                  value={item.name}
-                                  onChange={(e) => updateItem(item.id, { name: e.target.value })}
-                                  className="h-8"
-                                  onBlur={() => setEditingItem(null)}
-                                  onKeyDown={(e) => e.key === 'Enter' && setEditingItem(null)}
-                                  autoFocus
-                                />
-                              ) : (
-                                <div 
-                                  className="font-medium cursor-pointer hover:text-primary"
-                                  onClick={() => setEditingItem(item.id)}
-                                >
-                                  {item.name}
+        {/* Items by Room */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold">Inventory Items by Room</h2>
+            <Button onClick={() => setShowAddForm(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Item
+            </Button>
+          </div>
+
+          {(() => {
+            // Group items by room
+            const roomGroups = items.reduce((groups, item) => {
+              const room = item.room || 'Unassigned';
+              if (!groups[room]) groups[room] = [];
+              groups[room].push(item);
+              return groups;
+            }, {} as Record<string, InventoryItem[]>);
+
+            // Get photos for each room
+            const getRoomPhotos = (roomItems: InventoryItem[]) => {
+              const imageNumbers = new Set(roomItems.map(item => item.found_in_image).filter(Boolean));
+              return uploadedImages.filter(img => {
+                const imgNumber = parseInt(img.file_path.split('_')[1]) || 0;
+                return imageNumbers.has(imgNumber);
+              });
+            };
+
+            return Object.entries(roomGroups).map(([room, roomItems]) => {
+              const roomPhotos = getRoomPhotos(roomItems);
+              const roomVolume = roomItems.reduce((sum, item) => sum + (item.volume * item.quantity), 0);
+              const roomWeight = roomItems.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
+
+              return (
+                <Card key={room} className="mb-6">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="flex items-center gap-2">
+                          {room}
+                          <Badge variant="secondary">{roomItems.length} items</Badge>
+                        </CardTitle>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {roomVolume.toFixed(1)} cu ft • {roomWeight.toFixed(0)} lbs
+                        </p>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead className="border-b">
+                          <tr className="text-left">
+                            <th className="p-4 w-20">Going</th>
+                            <th className="p-4">Item Name</th>
+                            <th className="p-4">Image #</th>
+                            <th className="p-4">Quantity</th>
+                            <th className="p-4">Volume (cu ft)</th>
+                            <th className="p-4">Weight (lbs)</th>
+                            <th className="p-4">Room</th>
+                            <th className="p-4">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {roomItems.map((item) => (
+                            <tr key={item.id} className="border-b hover:bg-muted/50">
+                              <td className="p-4">
+                                <div className="flex flex-col items-center gap-1">
+                                  <Switch
+                                    checked={item.is_going !== false}
+                                    onCheckedChange={(checked) => updateItem(item.id, { is_going: checked })}
+                                  />
+                                  <span className="text-xs text-muted-foreground">
+                                    {item.is_going !== false ? 'Going' : 'Not going'}
+                                  </span>
                                 </div>
-                              )}
-                           </div>
-                         </div>
-                       </td>
-                       <td className="p-4">
-                          <Badge variant="outline" className="text-xs">
-                            #{item.found_in_image || 'N/A'}
-                          </Badge>
-                       </td>
-                      <td className="p-4">
-                        <Input
-                          type="number"
-                          value={item.quantity}
-                          onChange={(e) => updateItem(item.id, { quantity: parseInt(e.target.value) || 1 })}
-                          className="h-8 w-16"
-                          min="1"
-                        />
-                      </td>
-                      <td className="p-4">
-                        <Input
-                          type="number"
-                          value={item.volume}
-                          onChange={(e) => updateItem(item.id, { volume: parseFloat(e.target.value) || 0 })}
-                          className="h-8 w-20"
-                          step="0.1"
-                          min="0"
-                        />
-                      </td>
-                      <td className="p-4">
-                        <Input
-                          type="number"
-                          value={item.weight}
-                          onChange={(e) => updateItem(item.id, { weight: parseFloat(e.target.value) || 0 })}
-                          className="h-8 w-20"
-                          step="0.5"
-                          min="0"
-                        />
-                       </td>
-                       <td className="p-4">
-                         <RoomDropdown
-                           value={item.room}
-                           onValueChange={(room) => updateItem(item.id, { room })}
-                         />
-                       </td>
-                      <td className="p-4">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => deleteItem(item.id)}
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+                              </td>
+                               <td className="p-4">
+                                 <div className="flex items-center gap-3">
+                                   <div>
+                                      {editingItem === item.id ? (
+                                        <Input
+                                          value={item.name}
+                                          onChange={(e) => updateItem(item.id, { name: e.target.value })}
+                                          className="h-8"
+                                          onBlur={() => setEditingItem(null)}
+                                          onKeyDown={(e) => e.key === 'Enter' && setEditingItem(null)}
+                                          autoFocus
+                                        />
+                                      ) : (
+                                        <div 
+                                          className="font-medium cursor-pointer hover:text-primary"
+                                          onClick={() => setEditingItem(item.id)}
+                                        >
+                                          {item.name}
+                                        </div>
+                                      )}
+                                   </div>
+                                 </div>
+                               </td>
+                               <td className="p-4">
+                                  <Badge variant="outline" className="text-xs">
+                                    #{item.found_in_image || 'N/A'}
+                                  </Badge>
+                               </td>
+                              <td className="p-4">
+                                <Input
+                                  type="number"
+                                  value={item.quantity}
+                                  onChange={(e) => updateItem(item.id, { quantity: parseInt(e.target.value) || 1 })}
+                                  className="h-8 w-16"
+                                  min="1"
+                                />
+                              </td>
+                              <td className="p-4">
+                                <Input
+                                  type="number"
+                                  value={item.volume}
+                                  onChange={(e) => updateItem(item.id, { volume: parseFloat(e.target.value) || 0 })}
+                                  className="h-8 w-20"
+                                  step="0.1"
+                                  min="0"
+                                />
+                              </td>
+                              <td className="p-4">
+                                <Input
+                                  type="number"
+                                  value={item.weight}
+                                  onChange={(e) => updateItem(item.id, { weight: parseFloat(e.target.value) || 0 })}
+                                  className="h-8 w-20"
+                                  step="0.5"
+                                  min="0"
+                                />
+                               </td>
+                               <td className="p-4">
+                                 <RoomDropdown
+                                   value={item.room}
+                                   onValueChange={(room) => updateItem(item.id, { room })}
+                                 />
+                               </td>
+                              <td className="p-4">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => deleteItem(item.id)}
+                                  className="text-destructive hover:text-destructive"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Room Photos */}
+                    {roomPhotos.length > 0 && (
+                      <div className="border-t p-4">
+                        <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                          <ImageIcon className="h-4 w-4" />
+                          Photos from this room ({roomPhotos.length})
+                        </h4>
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                          {roomPhotos.map((image, index) => (
+                            <div
+                              key={image.id}
+                              className="relative group cursor-pointer"
+                              onClick={() => setSelectedImage(getImageUrl(image.file_path))}
+                            >
+                              <img
+                                src={getImageUrl(image.file_path)}
+                                alt={image.file_name}
+                                className="w-full h-20 object-cover rounded-md border hover:border-primary transition-colors"
+                              />
+                               <div className="absolute top-1 left-1">
+                                 <Badge variant="secondary" className="text-xs font-bold bg-white/90 text-black">
+                                   #{image.file_path.split('_')[1] || index + 1}
+                                 </Badge>
+                               </div>
+                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors rounded-md flex items-center justify-center">
+                                <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <div className="bg-white/90 p-1 rounded text-xs font-medium">
+                                    Click to view
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            });
+          })()}
+        </div>
 
         {/* Add Item Form */}
         {showAddForm && (
@@ -556,46 +634,6 @@ export default function Review() {
           </Card>
         )}
 
-        {/* Uploaded Photos Section */}
-        {uploadedImages.length > 0 && (
-          <Card className="mb-8">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ImageIcon className="h-5 w-5" />
-                Uploaded Photos ({uploadedImages.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                 {uploadedImages.map((image, index) => (
-                   <div
-                     key={image.id}
-                     className="relative group cursor-pointer"
-                     onClick={() => setSelectedImage(getImageUrl(image.file_path))}
-                   >
-                     <img
-                       src={getImageUrl(image.file_path)}
-                       alt={image.file_name}
-                       className="w-full h-24 object-cover rounded-lg border hover:border-primary transition-colors"
-                     />
-                      <div className="absolute top-2 left-2">
-                        <Badge variant="secondary" className="text-xs font-bold bg-white/90 text-black">
-                          #{image.file_path.split('_')[1] || index + 1}
-                        </Badge>
-                      </div>
-                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors rounded-lg flex items-center justify-center">
-                       <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                         <div className="bg-white/90 p-1 rounded text-xs font-medium">
-                           Click to view
-                         </div>
-                       </div>
-                     </div>
-                   </div>
-                 ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         {/* Image Preview Dialog */}
         <Dialog open={selectedImage !== null} onOpenChange={() => setSelectedImage(null)}>
