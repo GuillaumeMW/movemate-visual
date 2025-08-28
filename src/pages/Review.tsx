@@ -86,70 +86,6 @@ export default function Review() {
   // Debounce timer reference
   const debounceTimers = useRef<{ [key: string]: NodeJS.Timeout }>({});
 
-  // Debounced input handler to prevent re-renders on every keystroke
-  const handleDebouncedInputChange = useCallback((itemId: string, field: 'quantity' | 'volume' | 'weight', value: string) => {
-    // Update local editing state immediately for responsive UI
-    setEditingValues(prev => ({...prev, [`${itemId}-${field}`]: value}));
-
-    // Clear any existing debounce timer for this item
-    if (debounceTimers.current[`${itemId}-${field}`]) {
-      clearTimeout(debounceTimers.current[`${itemId}-${field}`]);
-    }
-
-    // Set a new timer to update the main state after a delay
-    debounceTimers.current[`${itemId}-${field}`] = setTimeout(() => {
-      // Convert the string value to a number
-      let numValue;
-      if (field === 'quantity') {
-        numValue = parseInt(value) || 1;
-      } else {
-        numValue = parseFloat(value) || 0;
-      }
-
-      // Update the main items state
-      setItems(prevItems => prevItems.map(item => item.id === itemId ? { ...item, [field]: numValue } : item));
-      setHasUnsavedChanges(true);
-      
-      // Clean up the editing value once it's applied
-      setEditingValues(prev => {
-        const newValues = {...prev};
-        delete newValues[`${itemId}-${field}`];
-        return newValues;
-      });
-    }, 500); // 500ms debounce time
-  }, []);
-
-  // Handle room changes immediately (no debounce needed for dropdowns)
-  const handleRoomChange = useCallback((itemId: string, room: string) => {
-    setItems(prevItems => prevItems.map(item => item.id === itemId ? { ...item, room } : item));
-    setHasUnsavedChanges(true);
-  }, []);
-
-  // Handle name changes with debouncing
-  const handleDebouncedNameChange = useCallback((itemId: string, value: string) => {
-    // Update local editing state immediately for responsive UI
-    setEditingValues(prev => ({...prev, [`${itemId}-name`]: value}));
-
-    // Clear any existing debounce timer for this item
-    if (debounceTimers.current[`${itemId}-name`]) {
-      clearTimeout(debounceTimers.current[`${itemId}-name`]);
-    }
-
-    // Set a new timer to update the main state after a delay
-    debounceTimers.current[`${itemId}-name`] = setTimeout(() => {
-      // Update the main items state
-      setItems(prevItems => prevItems.map(item => item.id === itemId ? { ...item, name: value } : item));
-      setHasUnsavedChanges(true);
-      
-      // Clean up the editing value once it's applied
-      setEditingValues(prev => {
-        const newValues = {...prev};
-        delete newValues[`${itemId}-name`];
-        return newValues;
-      });
-    }, 500); // 500ms debounce time
-  }, []);
-
   // Load inventory items from database
   useEffect(() => {
     const loadInventoryData = async () => {
@@ -228,70 +164,9 @@ export default function Review() {
     is_going: true
   });
 
-  // Track unsaved changes
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  
-  // Local editing state for inputs to prevent slow updates
-  const [editingValues, setEditingValues] = useState<{[key: string]: string}>({});
-
-  // Cached calculations - only update when user clicks "Update & Save"
-  const [cachedTotals, setCachedTotals] = useState({
-    totalVolume: 0,
-    totalWeight: 0,
-    totalItems: 0,
-    roomGroups: {} as Record<string, InventoryItem[]>,
-    roomStats: {} as Record<string, { volume: number; weight: number; photos: UploadedImage[] }>
-  });
-
-  // Recalculate all expensive operations - only run when user explicitly requests it
-  const recalculateAll = () => {
-    // Get current items and images from state
-    const currentItems = items;
-    const currentImages = uploadedImages;
-    
-    const totalVolume = currentItems.reduce((sum, item) => sum + (item.volume * item.quantity), 0);
-    const totalWeight = currentItems.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
-    const totalItems = currentItems.reduce((sum, item) => sum + item.quantity, 0);
-
-    // Group items by room
-    const roomGroups = currentItems.reduce((groups, item) => {
-      const room = item.room || 'Unassigned';
-      if (!groups[room]) groups[room] = [];
-      groups[room].push(item);
-      return groups;
-    }, {} as Record<string, InventoryItem[]>);
-
-    // Calculate room stats
-    const roomStats: Record<string, { volume: number; weight: number; photos: UploadedImage[] }> = {};
-    Object.entries(roomGroups).forEach(([room, roomItems]) => {
-      const roomVolume = roomItems.reduce((sum, item) => sum + (item.volume * item.quantity), 0);
-      const roomWeight = roomItems.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
-      
-      // Get photos for this room
-      const imageNumbers = new Set(roomItems.map(item => item.found_in_image).filter(Boolean));
-      const roomPhotos = currentImages.filter(img => {
-        const imgNumber = parseInt(img.file_path.split('_')[1]) || 0;
-        return imageNumbers.has(imgNumber);
-      });
-
-      roomStats[room] = { volume: roomVolume, weight: roomWeight, photos: roomPhotos };
-    });
-
-    setCachedTotals({
-      totalVolume,
-      totalWeight,
-      totalItems,
-      roomGroups,
-      roomStats
-    });
-  };
-
-  // Initial calculation when data loads - run when items are first loaded
-  useEffect(() => {
-    if (!isLoading && items.length > 0 && Object.keys(cachedTotals.roomGroups).length === 0) {
-      recalculateAll();
-    }
-  }, [isLoading, items.length]);
+  const totalVolume = items.reduce((sum, item) => sum + (item.volume * item.quantity), 0);
+  const totalWeight = items.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
+  const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
 
   const updateItem = async (id: string, updates: Partial<InventoryItem>) => {
     try {
@@ -316,47 +191,51 @@ export default function Review() {
     }
   };
 
-  // Update item locally (without saving to database)
-  const updateItemLocally = useCallback((id: string, updates: Partial<InventoryItem>) => {
-    setItems(prev => prev.map(item => item.id === id ? { ...item, ...updates } : item));
-    setHasUnsavedChanges(true);
-  }, []);
-
-  // Update & Save all changes to database
-  const updateAndSave = async () => {
-    if (!sessionId) return;
-
-    try {
-      // Recalculate everything with current state
-      recalculateAll();
-      
-      // Update all items in database
-      const updatePromises = items.map(item => 
-        supabase
-          .from('inventory_items')
-          .update({
-            name: item.name,
-            quantity: item.quantity,
-            volume: item.volume,
-            weight: item.weight,
-            room: item.room,
-            is_going: item.is_going
-          })
-          .eq('id', item.id)
-      );
-
-      await Promise.all(updatePromises);
-      
-      // Update session totals
-      await updateSessionTotals();
-      
-      setHasUnsavedChanges(false);
-      toast.success('All changes saved successfully');
-    } catch (error) {
-      console.error('Error saving changes:', error);
-      toast.error('Failed to save changes');
+  // Debounced version of updateItem for numeric inputs
+  const debouncedUpdateItem = useCallback((id: string, updates: Partial<InventoryItem>, delay: number = 1500) => {
+    // Clear existing timer for this item
+    if (debounceTimers.current[id]) {
+      clearTimeout(debounceTimers.current[id]);
     }
-  };
+    
+    // Update local state immediately for responsive UI
+    setItems(prev => prev.map(item => item.id === id ? { ...item, ...updates } : item));
+    
+    // Set new timer to update database after delay
+    debounceTimers.current[id] = setTimeout(async () => {
+      try {
+        if (sessionId) {
+          const { error } = await supabase
+            .from('inventory_items')
+            .update(updates)
+            .eq('id', id);
+          
+          if (error) throw error;
+          
+          // Update session totals
+          await updateSessionTotals();
+          
+          // Show success notification
+          toast.success('Changes saved automatically');
+        }
+      } catch (error) {
+        console.error('Error updating item:', error);
+        toast.error('Failed to update item');
+        // Revert local state on error
+        const { data: originalItem } = await supabase
+          .from('inventory_items')
+          .select('*')
+          .eq('id', id)
+          .single();
+        if (originalItem) {
+          setItems(prev => prev.map(item => item.id === id ? originalItem : item));
+        }
+      }
+      
+      // Clean up timer reference
+      delete debounceTimers.current[id];
+    }, delay);
+  }, [sessionId, items]);
 
   const deleteItem = async (id: string) => {
     try {
@@ -550,58 +429,34 @@ export default function Review() {
     }
   }, [selectedImage, currentImageIndex, selectedImageRoom]);
 
-  // Cleanup debounce timers on unmount
-  React.useEffect(() => {
-    return () => {
-      Object.values(debounceTimers.current).forEach(timer => {
-        if (timer) clearTimeout(timer);
-      });
-    };
-  }, []);
-
 
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8 max-w-6xl">
         <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h1 className="text-3xl font-bold mb-2">Review Your Inventory</h1>
-              <p className="text-muted-foreground">
-                Review and edit the items we detected. Click on any field to edit it.
-              </p>
-            </div>
-            {sessionId && hasUnsavedChanges && (
-              <div className="flex flex-col items-end gap-2">
-                <p className="text-xs text-muted-foreground">
-                  Totals may be outdated - click Update & Save to refresh
-                </p>
-                <Button onClick={updateAndSave} className="flex items-center gap-2">
-                  <Save className="h-4 w-4" />
-                  Update & Save
-                </Button>
-              </div>
-            )}
-          </div>
+          <h1 className="text-3xl font-bold mb-2">Review Your Inventory</h1>
+          <p className="text-muted-foreground">
+            Review and edit the items we detected. Click on any field to edit it.
+          </p>
         </div>
 
         {/* Summary Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <Card>
             <CardContent className="p-6">
-              <div className="text-2xl font-bold">{cachedTotals.totalItems}</div>
+              <div className="text-2xl font-bold">{totalItems}</div>
               <p className="text-sm text-muted-foreground">Total Items</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-6">
-              <div className="text-2xl font-bold">{cachedTotals.totalVolume.toFixed(1)} cu ft</div>
+              <div className="text-2xl font-bold">{totalVolume.toFixed(1)} cu ft</div>
               <p className="text-sm text-muted-foreground">Total Volume</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-6">
-              <div className="text-2xl font-bold">{cachedTotals.totalWeight.toFixed(0)} lbs</div>
+              <div className="text-2xl font-bold">{totalWeight.toFixed(0)} lbs</div>
               <p className="text-sm text-muted-foreground">Total Weight</p>
             </CardContent>
           </Card>
@@ -620,7 +475,7 @@ export default function Review() {
                 </p>
                 <p className="text-xs text-blue-700 mt-1">
                   {sessionId 
-                    ? `Created: ${new Date(sessionInfo?.created_at).toLocaleDateString()} - ${hasUnsavedChanges ? 'You have unsaved changes' : 'All changes saved'}`
+                    ? `Created: ${new Date(sessionInfo?.created_at).toLocaleDateString()} - All changes are automatically saved`
                     : 'You can edit quantities, add notes, or add/remove items as needed'}
                 </p>
               </div>
@@ -647,13 +502,28 @@ export default function Review() {
             </Button>
           </div>
 
-          {Object.entries(cachedTotals.roomGroups).map(([room, cachedRoomItems]) => {
-            // Get current items for this room (live updates)
-            const currentRoomItems = items.filter(item => (item.room || 'Unassigned') === room);
-            const roomStats = cachedTotals.roomStats[room];
-            const roomPhotos = roomStats?.photos || [];
-            const roomVolume = roomStats?.volume || 0;
-            const roomWeight = roomStats?.weight || 0;
+          {(() => {
+            // Group items by room
+            const roomGroups = items.reduce((groups, item) => {
+              const room = item.room || 'Unassigned';
+              if (!groups[room]) groups[room] = [];
+              groups[room].push(item);
+              return groups;
+            }, {} as Record<string, InventoryItem[]>);
+
+            // Get photos for each room
+            const getRoomPhotos = (roomItems: InventoryItem[]) => {
+              const imageNumbers = new Set(roomItems.map(item => item.found_in_image).filter(Boolean));
+              return uploadedImages.filter(img => {
+                const imgNumber = parseInt(img.file_path.split('_')[1]) || 0;
+                return imageNumbers.has(imgNumber);
+              });
+            };
+
+            return Object.entries(roomGroups).map(([room, roomItems]) => {
+              const roomPhotos = getRoomPhotos(roomItems);
+              const roomVolume = roomItems.reduce((sum, item) => sum + (item.volume * item.quantity), 0);
+              const roomWeight = roomItems.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
 
               return (
                 <Card key={room} className="mb-6">
@@ -662,7 +532,7 @@ export default function Review() {
                       <div>
                         <CardTitle className="flex items-center gap-2">
                           {room}
-                          <Badge variant="secondary">{currentRoomItems.length} items</Badge>
+                          <Badge variant="secondary">{roomItems.length} items</Badge>
                         </CardTitle>
                         <p className="text-sm text-muted-foreground mt-1">
                           {roomVolume.toFixed(1)} cu ft • {roomWeight.toFixed(0)} lbs
@@ -723,32 +593,32 @@ export default function Review() {
                           </tr>
                         </thead>
                         <tbody>
-                          {currentRoomItems.map((item) => (
+                          {roomItems.map((item) => (
                             <tr key={item.id} className="border-b hover:bg-muted/50">
                               <td className="p-4">
-                                 <div className="flex flex-col items-center gap-1">
-                                   <Switch
-                                     checked={item.is_going !== false}
-                                     onCheckedChange={(checked) => updateItemLocally(item.id, { is_going: checked })}
-                                   />
-                                   <span className="text-xs text-muted-foreground">
-                                     {item.is_going !== false ? 'Going' : 'Not going'}
-                                   </span>
-                                 </div>
+                                <div className="flex flex-col items-center gap-1">
+                                  <Switch
+                                    checked={item.is_going !== false}
+                                    onCheckedChange={(checked) => updateItem(item.id, { is_going: checked })}
+                                  />
+                                  <span className="text-xs text-muted-foreground">
+                                    {item.is_going !== false ? 'Going' : 'Not going'}
+                                  </span>
+                                </div>
                               </td>
                                <td className="p-4">
                                  <div className="flex items-center gap-3">
                                    <div>
-                                       {editingItem === item.id ? (
-                                          <Input
-                                            value={editingValues[`${item.id}-name`] ?? item.name}
-                                            onChange={(e) => handleDebouncedNameChange(item.id, e.target.value)}
-                                            className="h-8"
-                                            onBlur={() => setEditingItem(null)}
-                                            onKeyDown={(e) => e.key === 'Enter' && setEditingItem(null)}
-                                            autoFocus
-                                          />
-                                        ) : (
+                                      {editingItem === item.id ? (
+                                        <Input
+                                          value={item.name}
+                                          onChange={(e) => updateItem(item.id, { name: e.target.value })}
+                                          className="h-8"
+                                          onBlur={() => setEditingItem(null)}
+                                          onKeyDown={(e) => e.key === 'Enter' && setEditingItem(null)}
+                                          autoFocus
+                                        />
+                                      ) : (
                                         <div 
                                           className="font-medium cursor-pointer hover:text-primary"
                                           onClick={() => setEditingItem(item.id)}
@@ -764,41 +634,41 @@ export default function Review() {
                                     #{item.found_in_image || 'N/A'}
                                   </Badge>
                                </td>
-                                  <td className="p-4">
-                                    <Input
-                                      type="number"
-                                      value={editingValues[`${item.id}-quantity`] ?? item.quantity.toString()}
-                                      onChange={(e) => handleDebouncedInputChange(item.id, 'quantity', e.target.value)}
-                                      className="h-8 w-16"
-                                      min="1"
-                                    />
-                                  </td>
-                                 <td className="p-4">
-                                    <Input
-                                      type="number"
-                                      value={editingValues[`${item.id}-volume`] ?? item.volume.toString()}
-                                      onChange={(e) => handleDebouncedInputChange(item.id, 'volume', e.target.value)}
-                                      className="h-8 w-20"
-                                      step="0.1"
-                                      min="0"
-                                    />
-                                  </td>
-                                 <td className="p-4">
-                                    <Input
-                                      type="number"
-                                      value={editingValues[`${item.id}-weight`] ?? item.weight.toString()}
-                                      onChange={(e) => handleDebouncedInputChange(item.id, 'weight', e.target.value)}
-                                      className="h-8 w-20"
-                                      step="0.5"
-                                      min="0"
-                                    />
-                                   </td>
-                                  <td className="p-4">
-                                    <RoomDropdown
-                                      value={item.room}
-                                      onValueChange={(room) => handleRoomChange(item.id, room)}
-                                    />
-                                  </td>
+                               <td className="p-4">
+                                 <Input
+                                   type="number"
+                                   value={item.quantity}
+                                   onChange={(e) => debouncedUpdateItem(item.id, { quantity: parseInt(e.target.value) || 1 })}
+                                   className="h-8 w-16"
+                                   min="1"
+                                 />
+                               </td>
+                               <td className="p-4">
+                                 <Input
+                                   type="number"
+                                   value={item.volume}
+                                   onChange={(e) => debouncedUpdateItem(item.id, { volume: parseFloat(e.target.value) || 0 })}
+                                   className="h-8 w-20"
+                                   step="0.1"
+                                   min="0"
+                                 />
+                               </td>
+                               <td className="p-4">
+                                 <Input
+                                   type="number"
+                                   value={item.weight}
+                                   onChange={(e) => debouncedUpdateItem(item.id, { weight: parseFloat(e.target.value) || 0 })}
+                                   className="h-8 w-20"
+                                   step="0.5"
+                                   min="0"
+                                 />
+                                </td>
+                               <td className="p-4">
+                                 <RoomDropdown
+                                   value={item.room}
+                                   onValueChange={(room) => updateItem(item.id, { room })}
+                                 />
+                               </td>
                               <td className="p-4">
                                 <Button
                                   variant="ghost"
@@ -849,35 +719,35 @@ export default function Review() {
                               placeholder="e.g., Sofa, Box, Table"
                             />
                           </div>
-                           <div>
-                             <label className="text-sm font-medium mb-2 block">Quantity</label>
-                             <Input
-                               type="number"
-                               value={newItem.quantity?.toString() || ''}
-                               onChange={(e) => setNewItem({...newItem, quantity: e.target.value === '' ? undefined : parseInt(e.target.value) || 1})}
-                               min="1"
-                             />
-                           </div>
-                           <div>
-                             <label className="text-sm font-medium mb-2 block">Volume (cu ft)</label>
-                             <Input
-                               type="number"
-                               value={newItem.volume?.toString() || ''}
-                               onChange={(e) => setNewItem({...newItem, volume: e.target.value === '' ? undefined : parseFloat(e.target.value) || 0})}
-                               step="0.1"
-                               min="0"
-                             />
-                           </div>
-                           <div>
-                             <label className="text-sm font-medium mb-2 block">Weight (lbs)</label>
-                             <Input
-                               type="number"
-                               value={newItem.weight?.toString() || ''}
-                               onChange={(e) => setNewItem({...newItem, weight: e.target.value === '' ? undefined : parseFloat(e.target.value) || 0})}
-                               step="0.5"
-                               min="0"
-                             />
-                           </div>
+                          <div>
+                            <label className="text-sm font-medium mb-2 block">Quantity</label>
+                            <Input
+                              type="number"
+                              value={newItem.quantity || 1}
+                              onChange={(e) => setNewItem({...newItem, quantity: parseInt(e.target.value) || 1})}
+                              min="1"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium mb-2 block">Volume (cu ft)</label>
+                            <Input
+                              type="number"
+                              value={newItem.volume || 0}
+                              onChange={(e) => setNewItem({...newItem, volume: parseFloat(e.target.value) || 0})}
+                              step="0.1"
+                              min="0"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium mb-2 block">Weight (lbs)</label>
+                            <Input
+                              type="number"
+                              value={newItem.weight || 0}
+                              onChange={(e) => setNewItem({...newItem, weight: parseFloat(e.target.value) || 0})}
+                              step="0.5"
+                              min="0"
+                            />
+                          </div>
                         </div>
                         <div className="flex gap-2">
                           <Button onClick={addNewItem}>
@@ -891,10 +761,11 @@ export default function Review() {
                       </div>
                     )}
                   </CardContent>
-                 </Card>
-               );
-             })}
-         </div>
+                </Card>
+              );
+            });
+          })()}
+        </div>
 
 
 
