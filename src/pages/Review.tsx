@@ -154,8 +154,7 @@ export default function Review() {
   }, [sessionId]);
   
   const [editingItem, setEditingItem] = useState<string | null>(null);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [addFormRoom, setAddFormRoom] = useState<string>('');
+  const [activeAddFormRoom, setActiveAddFormRoom] = useState<string | null>(null);
   const [newItem, setNewItem] = useState<Partial<InventoryItem>>({
     name: '',
     quantity: 1,
@@ -273,7 +272,7 @@ export default function Review() {
         quantity: newItem.quantity || 1,
         volume: newItem.volume || 0,
         weight: newItem.weight || 0,
-        room: newItem.room || addFormRoom,
+        room: newItem.room || activeAddFormRoom,
         is_going: newItem.is_going !== false
       };
 
@@ -306,8 +305,7 @@ export default function Review() {
         room: '',
         is_going: true
       });
-      setShowAddForm(false);
-      setAddFormRoom('');
+      setActiveAddFormRoom(null);
       toast.success('Item added');
     } catch (error) {
       console.error('Error adding item:', error);
@@ -316,7 +314,7 @@ export default function Review() {
   };
 
   const openAddFormForRoom = (room: string) => {
-    setAddFormRoom(room);
+    setActiveAddFormRoom(room);
     setNewItem({
       name: '',
       quantity: 1,
@@ -325,7 +323,18 @@ export default function Review() {
       room: room,
       is_going: true
     });
-    setShowAddForm(true);
+  };
+
+  const closeAddForm = () => {
+    setActiveAddFormRoom(null);
+    setNewItem({
+      name: '',
+      quantity: 1,
+      volume: 0,
+      weight: 0,
+      room: '',
+      is_going: true
+    });
   };
 
 
@@ -687,6 +696,70 @@ export default function Review() {
                         Add Item to {room}
                       </Button>
                     </div>
+
+                    {/* Add Item Form for this room */}
+                    {activeAddFormRoom === room && (
+                      <div className="p-4 border-t bg-blue-50 border-blue-200">
+                        <div className="flex items-center justify-between mb-4">
+                          <h4 className="font-medium">Add New Item to {room}</h4>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={closeAddForm}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                          <div>
+                            <label className="text-sm font-medium mb-2 block">Item Name *</label>
+                            <Input
+                              value={newItem.name || ''}
+                              onChange={(e) => setNewItem({...newItem, name: e.target.value})}
+                              placeholder="e.g., Sofa, Box, Table"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium mb-2 block">Quantity</label>
+                            <Input
+                              type="number"
+                              value={newItem.quantity || 1}
+                              onChange={(e) => setNewItem({...newItem, quantity: parseInt(e.target.value) || 1})}
+                              min="1"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium mb-2 block">Volume (cu ft)</label>
+                            <Input
+                              type="number"
+                              value={newItem.volume || 0}
+                              onChange={(e) => setNewItem({...newItem, volume: parseFloat(e.target.value) || 0})}
+                              step="0.1"
+                              min="0"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium mb-2 block">Weight (lbs)</label>
+                            <Input
+                              type="number"
+                              value={newItem.weight || 0}
+                              onChange={(e) => setNewItem({...newItem, weight: parseFloat(e.target.value) || 0})}
+                              step="0.5"
+                              min="0"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button onClick={addNewItem}>
+                            <Save className="h-4 w-4 mr-2" />
+                            Add Item
+                          </Button>
+                          <Button variant="outline" onClick={closeAddForm}>
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               );
@@ -694,80 +767,6 @@ export default function Review() {
           })()}
         </div>
 
-        {/* Add Item Form */}
-        {showAddForm && (
-          <Card className="mb-8 border-primary">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Add New Item</CardTitle>
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={() => setShowAddForm(false)}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Item Name *</label>
-                  <Input
-                    value={newItem.name || ''}
-                    onChange={(e) => setNewItem({...newItem, name: e.target.value})}
-                    placeholder="e.g., Sofa, Box, Table"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Quantity</label>
-                  <Input
-                    type="number"
-                    value={newItem.quantity || 1}
-                    onChange={(e) => setNewItem({...newItem, quantity: parseInt(e.target.value) || 1})}
-                    min="1"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Volume (cu ft)</label>
-                  <Input
-                    type="number"
-                    value={newItem.volume || 0}
-                    onChange={(e) => setNewItem({...newItem, volume: parseFloat(e.target.value) || 0})}
-                    step="0.1"
-                    min="0"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Weight (lbs)</label>
-                  <Input
-                    type="number"
-                    value={newItem.weight || 0}
-                    onChange={(e) => setNewItem({...newItem, weight: parseFloat(e.target.value) || 0})}
-                    step="0.5"
-                    min="0"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Room</label>
-                  <RoomDropdown
-                    value={newItem.room || addFormRoom}
-                    onValueChange={(room) => setNewItem({...newItem, room})}
-                  />
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button onClick={addNewItem}>
-                  <Save className="h-4 w-4 mr-2" />
-                  Add Item
-                </Button>
-                <Button variant="outline" onClick={() => setShowAddForm(false)}>
-                  Cancel
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
 
         {/* Image Preview Dialog */}
