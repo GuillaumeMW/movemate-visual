@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Trash2, Edit3, Plus, Save, X, Image as ImageIcon, ChevronLeft, ChevronRight, Check } from 'lucide-react';
+import { Trash2, Edit3, Plus, Save, X, Image as ImageIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { RoomDropdown } from '@/components/RoomDropdown';
@@ -80,11 +80,11 @@ export default function Review() {
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [selectedImageRoom, setSelectedImageRoom] = useState<string | null>(null);
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // Debounce timer reference
   const debounceTimers = useRef<{ [key: string]: NodeJS.Timeout }>({});
-  const [savingItems, setSavingItems] = useState<Set<string>>(new Set());
-  const [savedItems, setSavedItems] = useState<Set<string>>(new Set());
 
   // Load inventory items from database
   useEffect(() => {
@@ -201,14 +201,6 @@ export default function Review() {
     // Update local state immediately for responsive UI
     setItems(prev => prev.map(item => item.id === id ? { ...item, ...updates } : item));
     
-    // Mark item as saving and remove from saved items
-    setSavingItems(prev => new Set(prev).add(id));
-    setSavedItems(prev => {
-      const newSet = new Set(prev);
-      newSet.delete(id);
-      return newSet;
-    });
-    
     // Set new timer to update database after delay
     debounceTimers.current[id] = setTimeout(async () => {
       try {
@@ -222,18 +214,6 @@ export default function Review() {
           
           // Update session totals
           await updateSessionTotals();
-          
-          // Mark item as saved
-          setSavedItems(prev => new Set(prev).add(id));
-          
-          // Remove saved indicator after 2 seconds
-          setTimeout(() => {
-            setSavedItems(prev => {
-              const newSet = new Set(prev);
-              newSet.delete(id);
-              return newSet;
-            });
-          }, 2000);
         }
       } catch (error) {
         console.error('Error updating item:', error);
@@ -248,13 +228,6 @@ export default function Review() {
           setItems(prev => prev.map(item => item.id === id ? originalItem : item));
         }
       }
-      
-      // Remove from saving items
-      setSavingItems(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(id);
-        return newSet;
-      });
       
       // Clean up timer reference
       delete debounceTimers.current[id];
@@ -634,50 +607,35 @@ export default function Review() {
                                     #{item.found_in_image || 'N/A'}
                                   </Badge>
                                </td>
-                                <td className="p-4">
-                                  <div className="flex items-center gap-2">
-                                    <Input
-                                      type="number"
-                                      value={item.quantity}
-                                      onChange={(e) => debouncedUpdateItem(item.id, { quantity: parseInt(e.target.value) || 1 })}
-                                      className="h-8 w-16"
-                                      min="1"
-                                    />
-                                    {savedItems.has(item.id) && (
-                                      <Check className="h-3 w-3 text-green-500" />
-                                    )}
-                                  </div>
+                               <td className="p-4">
+                                 <Input
+                                   type="number"
+                                   value={item.quantity}
+                                   onChange={(e) => debouncedUpdateItem(item.id, { quantity: parseInt(e.target.value) || 1 })}
+                                   className="h-8 w-16"
+                                   min="1"
+                                 />
+                               </td>
+                               <td className="p-4">
+                                 <Input
+                                   type="number"
+                                   value={item.volume}
+                                   onChange={(e) => debouncedUpdateItem(item.id, { volume: parseFloat(e.target.value) || 0 })}
+                                   className="h-8 w-20"
+                                   step="0.1"
+                                   min="0"
+                                 />
+                               </td>
+                               <td className="p-4">
+                                 <Input
+                                   type="number"
+                                   value={item.weight}
+                                   onChange={(e) => debouncedUpdateItem(item.id, { weight: parseFloat(e.target.value) || 0 })}
+                                   className="h-8 w-20"
+                                   step="0.5"
+                                   min="0"
+                                 />
                                 </td>
-                                <td className="p-4">
-                                  <div className="flex items-center gap-2">
-                                    <Input
-                                      type="number"
-                                      value={item.volume}
-                                      onChange={(e) => debouncedUpdateItem(item.id, { volume: parseFloat(e.target.value) || 0 })}
-                                      className="h-8 w-20"
-                                      step="0.1"
-                                      min="0"
-                                    />
-                                    {savedItems.has(item.id) && (
-                                      <Check className="h-3 w-3 text-green-500" />
-                                    )}
-                                  </div>
-                                </td>
-                                <td className="p-4">
-                                  <div className="flex items-center gap-2">
-                                    <Input
-                                      type="number"
-                                      value={item.weight}
-                                      onChange={(e) => debouncedUpdateItem(item.id, { weight: parseFloat(e.target.value) || 0 })}
-                                      className="h-8 w-20"
-                                      step="0.5"
-                                      min="0"
-                                    />
-                                    {savedItems.has(item.id) && (
-                                      <Check className="h-3 w-3 text-green-500" />
-                                    )}
-                                  </div>
-                                 </td>
                                <td className="p-4">
                                  <RoomDropdown
                                    value={item.room}
