@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -82,6 +82,9 @@ export default function Review() {
   const [selectedImageRoom, setSelectedImageRoom] = useState<string | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // Debounce timer reference
+  const debounceTimers = useRef<{ [key: string]: NodeJS.Timeout }>({});
 
   // Load inventory items from database
   useEffect(() => {
@@ -187,6 +190,49 @@ export default function Review() {
       toast.error('Failed to update item');
     }
   };
+
+  // Debounced version of updateItem for numeric inputs
+  const debouncedUpdateItem = useCallback((id: string, updates: Partial<InventoryItem>, delay: number = 500) => {
+    // Clear existing timer for this item
+    if (debounceTimers.current[id]) {
+      clearTimeout(debounceTimers.current[id]);
+    }
+    
+    // Update local state immediately for responsive UI
+    setItems(prev => prev.map(item => item.id === id ? { ...item, ...updates } : item));
+    
+    // Set new timer to update database after delay
+    debounceTimers.current[id] = setTimeout(async () => {
+      try {
+        if (sessionId) {
+          const { error } = await supabase
+            .from('inventory_items')
+            .update(updates)
+            .eq('id', id);
+          
+          if (error) throw error;
+          
+          // Update session totals
+          await updateSessionTotals();
+        }
+      } catch (error) {
+        console.error('Error updating item:', error);
+        toast.error('Failed to update item');
+        // Revert local state on error
+        const { data: originalItem } = await supabase
+          .from('inventory_items')
+          .select('*')
+          .eq('id', id)
+          .single();
+        if (originalItem) {
+          setItems(prev => prev.map(item => item.id === id ? originalItem : item));
+        }
+      }
+      
+      // Clean up timer reference
+      delete debounceTimers.current[id];
+    }, delay);
+  }, [sessionId, items]);
 
   const deleteItem = async (id: string) => {
     try {
@@ -561,35 +607,35 @@ export default function Review() {
                                     #{item.found_in_image || 'N/A'}
                                   </Badge>
                                </td>
-                              <td className="p-4">
-                                <Input
-                                  type="number"
-                                  value={item.quantity}
-                                  onChange={(e) => updateItem(item.id, { quantity: parseInt(e.target.value) || 1 })}
-                                  className="h-8 w-16"
-                                  min="1"
-                                />
-                              </td>
-                              <td className="p-4">
-                                <Input
-                                  type="number"
-                                  value={item.volume}
-                                  onChange={(e) => updateItem(item.id, { volume: parseFloat(e.target.value) || 0 })}
-                                  className="h-8 w-20"
-                                  step="0.1"
-                                  min="0"
-                                />
-                              </td>
-                              <td className="p-4">
-                                <Input
-                                  type="number"
-                                  value={item.weight}
-                                  onChange={(e) => updateItem(item.id, { weight: parseFloat(e.target.value) || 0 })}
-                                  className="h-8 w-20"
-                                  step="0.5"
-                                  min="0"
-                                />
+                               <td className="p-4">
+                                 <Input
+                                   type="number"
+                                   value={item.quantity}
+                                   onChange={(e) => debouncedUpdateItem(item.id, { quantity: parseInt(e.target.value) || 1 })}
+                                   className="h-8 w-16"
+                                   min="1"
+                                 />
                                </td>
+                               <td className="p-4">
+                                 <Input
+                                   type="number"
+                                   value={item.volume}
+                                   onChange={(e) => debouncedUpdateItem(item.id, { volume: parseFloat(e.target.value) || 0 })}
+                                   className="h-8 w-20"
+                                   step="0.1"
+                                   min="0"
+                                 />
+                               </td>
+                               <td className="p-4">
+                                 <Input
+                                   type="number"
+                                   value={item.weight}
+                                   onChange={(e) => debouncedUpdateItem(item.id, { weight: parseFloat(e.target.value) || 0 })}
+                                   className="h-8 w-20"
+                                   step="0.5"
+                                   min="0"
+                                 />
+                                </td>
                                <td className="p-4">
                                  <RoomDropdown
                                    value={item.room}
