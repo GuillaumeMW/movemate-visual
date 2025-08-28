@@ -176,8 +176,8 @@ export default function Review() {
     roomStats: {} as Record<string, { volume: number; weight: number; photos: UploadedImage[] }>
   });
 
-  // Recalculate all expensive operations
-  const recalculateAll = useCallback(() => {
+  // Recalculate all expensive operations - only run when user explicitly requests it
+  const recalculateAll = () => {
     const totalVolume = items.reduce((sum, item) => sum + (item.volume * item.quantity), 0);
     const totalWeight = items.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
     const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
@@ -213,14 +213,14 @@ export default function Review() {
       roomGroups,
       roomStats
     });
-  }, [items, uploadedImages]);
+  };
 
-  // Initial calculation when data loads
+  // Initial calculation when data loads - only run once
   useEffect(() => {
-    if (!isLoading) {
+    if (!isLoading && items.length > 0) {
       recalculateAll();
     }
-  }, [recalculateAll, isLoading]);
+  }, [isLoading]);
 
   const updateItem = async (id: string, updates: Partial<InventoryItem>) => {
     try {
