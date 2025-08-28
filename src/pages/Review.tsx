@@ -155,6 +155,7 @@ export default function Review() {
   
   const [editingItem, setEditingItem] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [addFormRoom, setAddFormRoom] = useState<string>('');
   const [newItem, setNewItem] = useState<Partial<InventoryItem>>({
     name: '',
     quantity: 1,
@@ -272,7 +273,7 @@ export default function Review() {
         quantity: newItem.quantity || 1,
         volume: newItem.volume || 0,
         weight: newItem.weight || 0,
-        room: newItem.room,
+        room: newItem.room || addFormRoom,
         is_going: newItem.is_going !== false
       };
 
@@ -306,11 +307,25 @@ export default function Review() {
         is_going: true
       });
       setShowAddForm(false);
+      setAddFormRoom('');
       toast.success('Item added');
     } catch (error) {
       console.error('Error adding item:', error);
       toast.error('Failed to add item');
     }
+  };
+
+  const openAddFormForRoom = (room: string) => {
+    setAddFormRoom(room);
+    setNewItem({
+      name: '',
+      quantity: 1,
+      volume: 0,
+      weight: 0,
+      room: room,
+      is_going: true
+    });
+    setShowAddForm(true);
   };
 
 
@@ -472,9 +487,9 @@ export default function Review() {
         <div className="mb-8">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold">Inventory Items by Room</h2>
-            <Button onClick={() => setShowAddForm(true)}>
+            <Button onClick={() => {}}>
               <Plus className="h-4 w-4 mr-2" />
-              Add Item
+              Add Room
             </Button>
           </div>
 
@@ -660,6 +675,18 @@ export default function Review() {
                         </tbody>
                       </table>
                     </div>
+                    
+                    {/* Add Item Button for this room */}
+                    <div className="p-4 border-t bg-muted/30">
+                      <Button 
+                        variant="outline" 
+                        onClick={() => openAddFormForRoom(room)}
+                        className="w-full"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Item to {room}
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               );
@@ -724,7 +751,7 @@ export default function Review() {
                 <div>
                   <label className="text-sm font-medium mb-2 block">Room</label>
                   <RoomDropdown
-                    value={newItem.room}
+                    value={newItem.room || addFormRoom}
                     onValueChange={(room) => setNewItem({...newItem, room})}
                   />
                 </div>
