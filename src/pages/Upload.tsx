@@ -218,13 +218,26 @@ const UploadPage = () => {
       let roomMappings: Record<number, string> = {};
       let detectedRooms: string[] = [];
       
+      // Get the highest existing image number first (needed for both paths)
+      const { data: existingItems, error: existingError } = await supabase
+        .from('inventory_items')
+        .select('found_in_image')
+        .eq('session_id', session.id)
+        .not('found_in_image', 'is', null);
+      
+      let startingImageNumber = 1;
+      if (!existingError && existingItems && existingItems.length > 0) {
+        const maxImageNumber = Math.max(...existingItems.map(item => item.found_in_image || 0));
+        startingImageNumber = maxImageNumber + 1;
+      }
+      
       if (predefinedRoom) {
         // If we have a predefined room, assign all images to that room
         setCurrentStep('room-assignment');
         toast.info(`Assigning all photos to room: ${predefinedRoom}...`, { duration: 2000 });
         
-        for (let i = 1; i <= files.length; i++) {
-          roomMappings[i] = predefinedRoom;
+        for (let i = 0; i < files.length; i++) {
+          roomMappings[startingImageNumber + i] = predefinedRoom;
         }
         detectedRooms = [predefinedRoom];
         setRoomsDetected([predefinedRoom]);
@@ -253,6 +266,19 @@ const UploadPage = () => {
         roomMappings = roomData?.image_room_mapping || {};
         detectedRooms = roomData?.rooms_detected || [];
         
+        // Adjust room mappings to use actual image numbers instead of file indices
+        if (Object.keys(roomMappings).length > 0) {
+          const adjustedRoomMappings: Record<number, string> = {};
+          
+          Object.keys(roomMappings).forEach((key) => {
+            const fileIndex = parseInt(key);
+            const actualImageNumber = startingImageNumber + fileIndex - 1;
+            adjustedRoomMappings[actualImageNumber] = roomMappings[fileIndex];
+          });
+          
+          roomMappings = adjustedRoomMappings;
+        }
+        
         console.log('Room detection results:', { roomMappings, detectedRooms });
         setRoomsDetected(detectedRooms);
         toast.success(`✓ Detected ${detectedRooms.length} rooms: ${detectedRooms.join(', ')}`, { duration: 4000 });
@@ -264,19 +290,6 @@ const UploadPage = () => {
       setAnalysisProgress({ current: 0, total: files.length });
       let allItems: any[] = [];
       
-      // Get the highest existing image number to continue numbering from there
-      const { data: existingItems, error: existingError } = await supabase
-        .from('inventory_items')
-        .select('found_in_image')
-        .eq('session_id', session.id)
-        .not('found_in_image', 'is', null);
-      
-      let startingImageNumber = 1;
-      if (!existingError && existingItems && existingItems.length > 0) {
-        const maxImageNumber = Math.max(...existingItems.map(item => item.found_in_image || 0));
-        startingImageNumber = maxImageNumber + 1;
-      }
-      
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         setAnalysisProgress({ current: i + 1, total: files.length });
@@ -284,7 +297,7 @@ const UploadPage = () => {
         
         // Get room for this image (use the correct image number for room mapping)
         const currentImageNumber = startingImageNumber + i;
-        const imageRoom = roomMappings[i + 1] || 'unknown room';
+        const imageRoom = roomMappings[currentImageNumber] || 'unknown room';
         setCurrentRoom(imageRoom);
         
         toast.info(`Analyzing image ${currentImageNumber} of ${startingImageNumber + files.length - 1}...`, { 
