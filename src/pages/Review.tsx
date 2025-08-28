@@ -167,9 +167,10 @@ export default function Review() {
     is_going: true
   });
 
-  const totalVolume = items.reduce((sum, item) => sum + (item.volume * item.quantity), 0);
-  const totalWeight = items.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
-  const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
+  const goingItems = items.filter(item => item.is_going !== false);
+  const totalVolume = goingItems.reduce((sum, item) => sum + (item.volume * item.quantity), 0);
+  const totalWeight = goingItems.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
+  const totalItems = goingItems.reduce((sum, item) => sum + item.quantity, 0);
 
   const updateItem = async (id: string, updates: Partial<InventoryItem>) => {
     try {
@@ -372,12 +373,13 @@ export default function Review() {
     try {
       const { data: currentItems } = await supabase
         .from('inventory_items')
-        .select('volume, weight, quantity')
+        .select('volume, weight, quantity, is_going')
         .eq('session_id', sessionId);
 
       if (currentItems) {
-        const totalVolume = currentItems.reduce((sum, item) => sum + (item.volume * item.quantity), 0);
-        const totalWeight = currentItems.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
+        const goingItems = currentItems.filter(item => item.is_going !== false);
+        const totalVolume = goingItems.reduce((sum, item) => sum + (item.volume * item.quantity), 0);
+        const totalWeight = goingItems.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
 
         await supabase
           .from('inventory_sessions')
@@ -549,8 +551,9 @@ export default function Review() {
 
             return Object.entries(roomGroups).map(([room, roomItems]) => {
               const roomPhotos = getRoomPhotos(roomItems);
-              const roomVolume = roomItems.reduce((sum, item) => sum + (item.volume * item.quantity), 0);
-              const roomWeight = roomItems.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
+              const goingRoomItems = roomItems.filter(item => item.is_going !== false);
+              const roomVolume = goingRoomItems.reduce((sum, item) => sum + (item.volume * item.quantity), 0);
+              const roomWeight = goingRoomItems.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
 
               return (
                 <Card key={room} className="mb-6">
