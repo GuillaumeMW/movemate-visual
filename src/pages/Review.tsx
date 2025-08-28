@@ -164,6 +164,9 @@ export default function Review() {
     is_going: true
   });
 
+  // Track unsaved changes
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
   const totalVolume = items.reduce((sum, item) => sum + (item.volume * item.quantity), 0);
   const totalWeight = items.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
@@ -191,51 +194,44 @@ export default function Review() {
     }
   };
 
-  // Debounced version of updateItem for numeric inputs
-  const debouncedUpdateItem = useCallback((id: string, updates: Partial<InventoryItem>, delay: number = 1500) => {
-    // Clear existing timer for this item
-    if (debounceTimers.current[id]) {
-      clearTimeout(debounceTimers.current[id]);
-    }
-    
-    // Update local state immediately for responsive UI
+  // Update item locally (without saving to database)
+  const updateItemLocally = useCallback((id: string, updates: Partial<InventoryItem>) => {
     setItems(prev => prev.map(item => item.id === id ? { ...item, ...updates } : item));
-    
-    // Set new timer to update database after delay
-    debounceTimers.current[id] = setTimeout(async () => {
-      try {
-        if (sessionId) {
-          const { error } = await supabase
-            .from('inventory_items')
-            .update(updates)
-            .eq('id', id);
-          
-          if (error) throw error;
-          
-          // Update session totals
-          await updateSessionTotals();
-          
-          // Show success notification
-          toast.success('Changes saved automatically');
-        }
-      } catch (error) {
-        console.error('Error updating item:', error);
-        toast.error('Failed to update item');
-        // Revert local state on error
-        const { data: originalItem } = await supabase
+    setHasUnsavedChanges(true);
+  }, []);
+
+  // Save all changes to database
+  const saveChanges = async () => {
+    if (!sessionId || !hasUnsavedChanges) return;
+
+    try {
+      // Update all items in database
+      const updatePromises = items.map(item => 
+        supabase
           .from('inventory_items')
-          .select('*')
-          .eq('id', id)
-          .single();
-        if (originalItem) {
-          setItems(prev => prev.map(item => item.id === id ? originalItem : item));
-        }
-      }
+          .update({
+            name: item.name,
+            quantity: item.quantity,
+            volume: item.volume,
+            weight: item.weight,
+            room: item.room,
+            is_going: item.is_going
+          })
+          .eq('id', item.id)
+      );
+
+      await Promise.all(updatePromises);
       
-      // Clean up timer reference
-      delete debounceTimers.current[id];
-    }, delay);
-  }, [sessionId, items]);
+      // Update session totals
+      await updateSessionTotals();
+      
+      setHasUnsavedChanges(false);
+      toast.success('All changes saved successfully');
+    } catch (error) {
+      console.error('Error saving changes:', error);
+      toast.error('Failed to save changes');
+    }
+  };
 
   const deleteItem = async (id: string) => {
     try {
@@ -434,10 +430,20 @@ export default function Review() {
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8 max-w-6xl">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Review Your Inventory</h1>
-          <p className="text-muted-foreground">
-            Review and edit the items we detected. Click on any field to edit it.
-          </p>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1 className="text-3xl font-bold mb-2">Review Your Inventory</h1>
+              <p className="text-muted-foreground">
+                Review and edit the items we detected. Click on any field to edit it.
+              </p>
+            </div>
+            {sessionId && hasUnsavedChanges && (
+              <Button onClick={saveChanges} className="flex items-center gap-2">
+                <Save className="h-4 w-4" />
+                Save Changes
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Summary Stats */}
@@ -475,7 +481,7 @@ export default function Review() {
                 </p>
                 <p className="text-xs text-blue-700 mt-1">
                   {sessionId 
-                    ? `Created: ${new Date(sessionInfo?.created_at).toLocaleDateString()} - All changes are automatically saved`
+                    ? `Created: ${new Date(sessionInfo?.created_at).toLocaleDateString()} - ${hasUnsavedChanges ? 'You have unsaved changes' : 'All changes saved'}`
                     : 'You can edit quantities, add notes, or add/remove items as needed'}
                 </p>
               </div>
@@ -596,29 +602,29 @@ export default function Review() {
                           {roomItems.map((item) => (
                             <tr key={item.id} className="border-b hover:bg-muted/50">
                               <td className="p-4">
-                                <div className="flex flex-col items-center gap-1">
-                                  <Switch
-                                    checked={item.is_going !== false}
-                                    onCheckedChange={(checked) => updateItem(item.id, { is_going: checked })}
-                                  />
-                                  <span className="text-xs text-muted-foreground">
-                                    {item.is_going !== false ? 'Going' : 'Not going'}
-                                  </span>
-                                </div>
+                                 <div className="flex flex-col items-center gap-1">
+                                   <Switch
+                                     checked={item.is_going !== false}
+                                     onCheckedChange={(checked) => updateItemLocally(item.id, { is_going: checked })}
+                                   />
+                                   <span className="text-xs text-muted-foreground">
+                                     {item.is_going !== false ? 'Going' : 'Not going'}
+                                   </span>
+                                 </div>
                               </td>
                                <td className="p-4">
                                  <div className="flex items-center gap-3">
                                    <div>
-                                      {editingItem === item.id ? (
-                                        <Input
-                                          value={item.name}
-                                          onChange={(e) => updateItem(item.id, { name: e.target.value })}
-                                          className="h-8"
-                                          onBlur={() => setEditingItem(null)}
-                                          onKeyDown={(e) => e.key === 'Enter' && setEditingItem(null)}
-                                          autoFocus
-                                        />
-                                      ) : (
+                                       {editingItem === item.id ? (
+                                         <Input
+                                           value={item.name}
+                                           onChange={(e) => updateItemLocally(item.id, { name: e.target.value })}
+                                           className="h-8"
+                                           onBlur={() => setEditingItem(null)}
+                                           onKeyDown={(e) => e.key === 'Enter' && setEditingItem(null)}
+                                           autoFocus
+                                         />
+                                       ) : (
                                         <div 
                                           className="font-medium cursor-pointer hover:text-primary"
                                           onClick={() => setEditingItem(item.id)}
@@ -634,39 +640,39 @@ export default function Review() {
                                     #{item.found_in_image || 'N/A'}
                                   </Badge>
                                </td>
-                               <td className="p-4">
-                                 <Input
-                                   type="number"
-                                   value={item.quantity}
-                                   onChange={(e) => debouncedUpdateItem(item.id, { quantity: parseInt(e.target.value) || 1 })}
-                                   className="h-8 w-16"
-                                   min="1"
-                                 />
-                               </td>
-                               <td className="p-4">
-                                 <Input
-                                   type="number"
-                                   value={item.volume}
-                                   onChange={(e) => debouncedUpdateItem(item.id, { volume: parseFloat(e.target.value) || 0 })}
-                                   className="h-8 w-20"
-                                   step="0.1"
-                                   min="0"
-                                 />
-                               </td>
-                               <td className="p-4">
-                                 <Input
-                                   type="number"
-                                   value={item.weight}
-                                   onChange={(e) => debouncedUpdateItem(item.id, { weight: parseFloat(e.target.value) || 0 })}
-                                   className="h-8 w-20"
-                                   step="0.5"
-                                   min="0"
-                                 />
+                                <td className="p-4">
+                                  <Input
+                                    type="number"
+                                    value={item.quantity}
+                                    onChange={(e) => updateItemLocally(item.id, { quantity: parseInt(e.target.value) || 1 })}
+                                    className="h-8 w-16"
+                                    min="1"
+                                  />
                                 </td>
+                               <td className="p-4">
+                                  <Input
+                                    type="number"
+                                    value={item.volume}
+                                    onChange={(e) => updateItemLocally(item.id, { volume: parseFloat(e.target.value) || 0 })}
+                                    className="h-8 w-20"
+                                    step="0.1"
+                                    min="0"
+                                  />
+                                </td>
+                               <td className="p-4">
+                                  <Input
+                                    type="number"
+                                    value={item.weight}
+                                    onChange={(e) => updateItemLocally(item.id, { weight: parseFloat(e.target.value) || 0 })}
+                                    className="h-8 w-20"
+                                    step="0.5"
+                                    min="0"
+                                  />
+                                 </td>
                                <td className="p-4">
                                  <RoomDropdown
                                    value={item.room}
-                                   onValueChange={(room) => updateItem(item.id, { room })}
+                                   onValueChange={(room) => updateItemLocally(item.id, { room })}
                                  />
                                </td>
                               <td className="p-4">
