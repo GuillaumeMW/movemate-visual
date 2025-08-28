@@ -166,6 +166,9 @@ export default function Review() {
 
   // Track unsaved changes
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  
+  // Local editing state for inputs to prevent slow updates
+  const [editingValues, setEditingValues] = useState<{[key: string]: string}>({});
 
   // Cached calculations - only update when user clicks "Update & Save"
   const [cachedTotals, setCachedTotals] = useState({
@@ -688,35 +691,74 @@ export default function Review() {
                                     #{item.found_in_image || 'N/A'}
                                   </Badge>
                                </td>
-                                <td className="p-4">
-                                  <Input
-                                    type="number"
-                                    value={item.quantity}
-                                    onChange={(e) => updateItemLocally(item.id, { quantity: parseInt(e.target.value) || 1 })}
-                                    className="h-8 w-16"
-                                    min="1"
-                                  />
-                                </td>
-                               <td className="p-4">
-                                  <Input
-                                    type="number"
-                                    value={item.volume}
-                                    onChange={(e) => updateItemLocally(item.id, { volume: parseFloat(e.target.value) || 0 })}
-                                    className="h-8 w-20"
-                                    step="0.1"
-                                    min="0"
-                                  />
-                                </td>
-                               <td className="p-4">
-                                  <Input
-                                    type="number"
-                                    value={item.weight}
-                                    onChange={(e) => updateItemLocally(item.id, { weight: parseFloat(e.target.value) || 0 })}
-                                    className="h-8 w-20"
-                                    step="0.5"
-                                    min="0"
-                                  />
+                                 <td className="p-4">
+                                   <Input
+                                     type="number"
+                                     value={editingValues[`${item.id}-quantity`] ?? item.quantity.toString()}
+                                     onChange={(e) => setEditingValues(prev => ({...prev, [`${item.id}-quantity`]: e.target.value}))}
+                                     onBlur={(e) => {
+                                       const value = parseInt(e.target.value) || 1;
+                                       updateItemLocally(item.id, { quantity: value });
+                                       setEditingValues(prev => {
+                                         const {[`${item.id}-quantity`]: removed, ...rest} = prev;
+                                         return rest;
+                                       });
+                                     }}
+                                     onKeyDown={(e) => {
+                                       if (e.key === 'Enter') {
+                                         e.currentTarget.blur();
+                                       }
+                                     }}
+                                     className="h-8 w-16"
+                                     min="1"
+                                   />
                                  </td>
+                                <td className="p-4">
+                                   <Input
+                                     type="number"
+                                     value={editingValues[`${item.id}-volume`] ?? item.volume.toString()}
+                                     onChange={(e) => setEditingValues(prev => ({...prev, [`${item.id}-volume`]: e.target.value}))}
+                                     onBlur={(e) => {
+                                       const value = parseFloat(e.target.value) || 0;
+                                       updateItemLocally(item.id, { volume: value });
+                                       setEditingValues(prev => {
+                                         const {[`${item.id}-volume`]: removed, ...rest} = prev;
+                                         return rest;
+                                       });
+                                     }}
+                                     onKeyDown={(e) => {
+                                       if (e.key === 'Enter') {
+                                         e.currentTarget.blur();
+                                       }
+                                     }}
+                                     className="h-8 w-20"
+                                     step="0.1"
+                                     min="0"
+                                   />
+                                 </td>
+                                <td className="p-4">
+                                   <Input
+                                     type="number"
+                                     value={editingValues[`${item.id}-weight`] ?? item.weight.toString()}
+                                     onChange={(e) => setEditingValues(prev => ({...prev, [`${item.id}-weight`]: e.target.value}))}
+                                     onBlur={(e) => {
+                                       const value = parseFloat(e.target.value) || 0;
+                                       updateItemLocally(item.id, { weight: value });
+                                       setEditingValues(prev => {
+                                         const {[`${item.id}-weight`]: removed, ...rest} = prev;
+                                         return rest;
+                                       });
+                                     }}
+                                     onKeyDown={(e) => {
+                                       if (e.key === 'Enter') {
+                                         e.currentTarget.blur();
+                                       }
+                                     }}
+                                     className="h-8 w-20"
+                                     step="0.5"
+                                     min="0"
+                                   />
+                                  </td>
                                <td className="p-4">
                                  <RoomDropdown
                                    value={item.room}
