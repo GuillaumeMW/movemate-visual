@@ -64,19 +64,25 @@ const ROOMS = [
 export const RoomDropdown: React.FC<RoomDropdownProps> = ({ value, onValueChange, className }) => {
   const selectedRoom = ROOMS.find(room => room.name === value);
   
+  // Get all rooms including any custom ones not in predefined list
+  const allRooms = [...ROOMS];
+  if (value && !selectedRoom) {
+    allRooms.push({ name: value, color: 'bg-amber-100 text-amber-800 border-amber-200' });
+  }
+  
   return (
     <Select value={value} onValueChange={onValueChange}>
       <SelectTrigger className={`h-8 w-32 ${className}`}>
         <SelectValue placeholder="Select room">
-          {selectedRoom && (
-            <div className={`px-2 py-1 rounded text-xs font-medium ${selectedRoom.color}`}>
-              {selectedRoom.name}
+          {value && (
+            <div className={`px-2 py-1 rounded text-xs font-medium ${selectedRoom ? selectedRoom.color : 'bg-amber-100 text-amber-800 border-amber-200'}`}>
+              {value}
             </div>
           )}
         </SelectValue>
       </SelectTrigger>
       <SelectContent>
-        {ROOMS.map((room) => (
+        {allRooms.map((room) => (
           <SelectItem key={room.name} value={room.name}>
             <div className={`px-2 py-1 rounded text-xs font-medium ${room.color}`}>
               {room.name}
