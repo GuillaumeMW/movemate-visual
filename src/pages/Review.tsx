@@ -214,6 +214,9 @@ export default function Review() {
           
           // Update session totals
           await updateSessionTotals();
+          
+          // Show success notification
+          toast.success('Changes saved automatically');
         }
       } catch (error) {
         console.error('Error updating item:', error);
