@@ -260,14 +260,29 @@ export default function Review() {
 
   // Update & Save all changes to database
   const updateAndSave = async () => {
-    if (!sessionId || !hasUnsavedChanges) return;
+    if (!sessionId) return;
 
     try {
+      // Apply any pending editing values to items first
+      let updatedItems = [...items];
+      Object.entries(editingValues).forEach(([key, value]) => {
+        const [itemId, field] = key.split('-');
+        const itemIndex = updatedItems.findIndex(item => item.id === itemId);
+        if (itemIndex !== -1) {
+          const numValue = field === 'quantity' ? parseInt(value) || 1 : parseFloat(value) || 0;
+          updatedItems[itemIndex] = { ...updatedItems[itemIndex], [field]: numValue };
+        }
+      });
+      
+      // Update state with final values
+      setItems(updatedItems);
+      setEditingValues({});
+      
       // First recalculate everything
       recalculateAll();
       
       // Update all items in database
-      const updatePromises = items.map(item => 
+      const updatePromises = updatedItems.map(item => 
         supabase
           .from('inventory_items')
           .update({
@@ -696,19 +711,6 @@ export default function Review() {
                                      type="number"
                                      value={editingValues[`${item.id}-quantity`] ?? item.quantity.toString()}
                                      onChange={(e) => setEditingValues(prev => ({...prev, [`${item.id}-quantity`]: e.target.value}))}
-                                     onBlur={(e) => {
-                                       const value = parseInt(e.target.value) || 1;
-                                       updateItemLocally(item.id, { quantity: value });
-                                       setEditingValues(prev => {
-                                         const {[`${item.id}-quantity`]: removed, ...rest} = prev;
-                                         return rest;
-                                       });
-                                     }}
-                                     onKeyDown={(e) => {
-                                       if (e.key === 'Enter') {
-                                         e.currentTarget.blur();
-                                       }
-                                     }}
                                      className="h-8 w-16"
                                      min="1"
                                    />
@@ -718,19 +720,6 @@ export default function Review() {
                                      type="number"
                                      value={editingValues[`${item.id}-volume`] ?? item.volume.toString()}
                                      onChange={(e) => setEditingValues(prev => ({...prev, [`${item.id}-volume`]: e.target.value}))}
-                                     onBlur={(e) => {
-                                       const value = parseFloat(e.target.value) || 0;
-                                       updateItemLocally(item.id, { volume: value });
-                                       setEditingValues(prev => {
-                                         const {[`${item.id}-volume`]: removed, ...rest} = prev;
-                                         return rest;
-                                       });
-                                     }}
-                                     onKeyDown={(e) => {
-                                       if (e.key === 'Enter') {
-                                         e.currentTarget.blur();
-                                       }
-                                     }}
                                      className="h-8 w-20"
                                      step="0.1"
                                      min="0"
@@ -741,19 +730,6 @@ export default function Review() {
                                      type="number"
                                      value={editingValues[`${item.id}-weight`] ?? item.weight.toString()}
                                      onChange={(e) => setEditingValues(prev => ({...prev, [`${item.id}-weight`]: e.target.value}))}
-                                     onBlur={(e) => {
-                                       const value = parseFloat(e.target.value) || 0;
-                                       updateItemLocally(item.id, { weight: value });
-                                       setEditingValues(prev => {
-                                         const {[`${item.id}-weight`]: removed, ...rest} = prev;
-                                         return rest;
-                                       });
-                                     }}
-                                     onKeyDown={(e) => {
-                                       if (e.key === 'Enter') {
-                                         e.currentTarget.blur();
-                                       }
-                                     }}
                                      className="h-8 w-20"
                                      step="0.5"
                                      min="0"
