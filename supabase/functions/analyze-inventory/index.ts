@@ -75,6 +75,29 @@ Items that would normally be moved in boxes should be combined into box estimate
 - Large Boxes (4.5 cu ft): Bedding, linens, larger toys, lampshades → estimate large boxes  
 - Extra-Large Boxes (6 cu ft): Comforters, pillows, sports equipment → estimate extra-large boxes
 
+HIDDEN STORAGE ESTIMATION:
+You MUST also estimate boxes for contents that cannot be seen but would typically be stored in:
+- Kitchen cabinets and pantries: dishes, cookware, food items, small appliances
+- Dressers and wardrobes: clothing, personal items
+- Bathroom cabinets: toiletries, medications, towels
+- Closets: clothing, shoes, linens, storage items
+- Bookcases and shelving: books, decorative items, storage
+- Office furniture: papers, supplies, equipment
+- Any other storage furniture visible in the room
+
+For these ESTIMATED items, use the labels:
+- "Small boxes (est.)" for kitchen items, toiletries, office supplies, books
+- "Medium boxes (est.)" for clothing, linens, general household items
+- "Large boxes (est.)" for bulky stored items, bedding, seasonal items
+
+ESTIMATION GUIDELINES:
+- Kitchen: 2-4 small boxes per cabinet, 1-2 medium boxes per pantry
+- Dresser: 2-3 medium boxes per dresser (clothing)
+- Bathroom cabinet: 1 small box per cabinet
+- Closet: 3-5 medium boxes for clothing closets, 2-3 large boxes for linen closets
+- Bookcase: 1 small box per shelf section
+- Office desk: 1-2 small boxes per desk
+
 Example: Instead of listing "20 books, 15 CDs, 10 kitchen gadgets" → list "Small Boxes" with quantity 3-4${existingItemsContext}${roomContext}
 
 Return a JSON array where each item has: name (string), quantity (number), volume (number in cu ft), weight (number in lbs), room (string - the specific numbered room where this item is located, must match one of the rooms listed above for this image).`;
