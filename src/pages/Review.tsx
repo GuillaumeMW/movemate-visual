@@ -269,8 +269,12 @@ export default function Review() {
         const [itemId, field] = key.split('-');
         const itemIndex = updatedItems.findIndex(item => item.id === itemId);
         if (itemIndex !== -1) {
-          const numValue = field === 'quantity' ? parseInt(value) || 1 : parseFloat(value) || 0;
-          updatedItems[itemIndex] = { ...updatedItems[itemIndex], [field]: numValue };
+          if (field === 'name' || field === 'room') {
+            updatedItems[itemIndex] = { ...updatedItems[itemIndex], [field]: value };
+          } else {
+            const numValue = field === 'quantity' ? parseInt(value) || 1 : parseFloat(value) || 0;
+            updatedItems[itemIndex] = { ...updatedItems[itemIndex], [field]: numValue };
+          }
         }
       });
       
@@ -682,15 +686,29 @@ export default function Review() {
                                  <div className="flex items-center gap-3">
                                    <div>
                                        {editingItem === item.id ? (
-                                         <Input
-                                           value={item.name}
-                                           onChange={(e) => updateItemLocally(item.id, { name: e.target.value })}
-                                           className="h-8"
-                                           onBlur={() => setEditingItem(null)}
-                                           onKeyDown={(e) => e.key === 'Enter' && setEditingItem(null)}
-                                           autoFocus
-                                         />
-                                       ) : (
+                                          <Input
+                                            value={editingValues[`${item.id}-name`] ?? item.name}
+                                            onChange={(e) => setEditingValues(prev => ({...prev, [`${item.id}-name`]: e.target.value}))}
+                                            className="h-8"
+                                            onBlur={() => {
+                                              setEditingItem(null);
+                                              const newName = editingValues[`${item.id}-name`];
+                                              if (newName && newName !== item.name) {
+                                                updateItemLocally(item.id, { name: newName });
+                                              }
+                                            }}
+                                            onKeyDown={(e) => {
+                                              if (e.key === 'Enter') {
+                                                setEditingItem(null);
+                                                const newName = editingValues[`${item.id}-name`];
+                                                if (newName && newName !== item.name) {
+                                                  updateItemLocally(item.id, { name: newName });
+                                                }
+                                              }
+                                            }}
+                                            autoFocus
+                                          />
+                                        ) : (
                                         <div 
                                           className="font-medium cursor-pointer hover:text-primary"
                                           onClick={() => setEditingItem(item.id)}
@@ -735,12 +753,15 @@ export default function Review() {
                                      min="0"
                                    />
                                   </td>
-                               <td className="p-4">
-                                 <RoomDropdown
-                                   value={item.room}
-                                   onValueChange={(room) => updateItemLocally(item.id, { room })}
-                                 />
-                               </td>
+                                 <td className="p-4">
+                                   <RoomDropdown
+                                     value={editingValues[`${item.id}-room`] ?? item.room}
+                                     onValueChange={(room) => {
+                                       setEditingValues(prev => ({...prev, [`${item.id}-room`]: room}));
+                                       setHasUnsavedChanges(true);
+                                     }}
+                                   />
+                                 </td>
                               <td className="p-4">
                                 <Button
                                   variant="ghost"
