@@ -178,12 +178,16 @@ export default function Review() {
 
   // Recalculate all expensive operations - only run when user explicitly requests it
   const recalculateAll = () => {
-    const totalVolume = items.reduce((sum, item) => sum + (item.volume * item.quantity), 0);
-    const totalWeight = items.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
-    const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
+    // Get current items and images from state
+    const currentItems = items;
+    const currentImages = uploadedImages;
+    
+    const totalVolume = currentItems.reduce((sum, item) => sum + (item.volume * item.quantity), 0);
+    const totalWeight = currentItems.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
+    const totalItems = currentItems.reduce((sum, item) => sum + item.quantity, 0);
 
     // Group items by room
-    const roomGroups = items.reduce((groups, item) => {
+    const roomGroups = currentItems.reduce((groups, item) => {
       const room = item.room || 'Unassigned';
       if (!groups[room]) groups[room] = [];
       groups[room].push(item);
@@ -198,7 +202,7 @@ export default function Review() {
       
       // Get photos for this room
       const imageNumbers = new Set(roomItems.map(item => item.found_in_image).filter(Boolean));
-      const roomPhotos = uploadedImages.filter(img => {
+      const roomPhotos = currentImages.filter(img => {
         const imgNumber = parseInt(img.file_path.split('_')[1]) || 0;
         return imageNumbers.has(imgNumber);
       });
@@ -215,12 +219,12 @@ export default function Review() {
     });
   };
 
-  // Initial calculation when data loads - only run once
+  // Initial calculation when data loads - run when items are first loaded
   useEffect(() => {
-    if (!isLoading && items.length > 0) {
+    if (!isLoading && items.length > 0 && Object.keys(cachedTotals.roomGroups).length === 0) {
       recalculateAll();
     }
-  }, [isLoading]);
+  }, [isLoading, items.length]);
 
   const updateItem = async (id: string, updates: Partial<InventoryItem>) => {
     try {
@@ -567,7 +571,9 @@ export default function Review() {
             </Button>
           </div>
 
-          {Object.entries(cachedTotals.roomGroups).map(([room, roomItems]) => {
+          {Object.entries(cachedTotals.roomGroups).map(([room, cachedRoomItems]) => {
+            // Get current items for this room (live updates)
+            const currentRoomItems = items.filter(item => (item.room || 'Unassigned') === room);
             const roomStats = cachedTotals.roomStats[room];
             const roomPhotos = roomStats?.photos || [];
             const roomVolume = roomStats?.volume || 0;
@@ -580,7 +586,7 @@ export default function Review() {
                       <div>
                         <CardTitle className="flex items-center gap-2">
                           {room}
-                          <Badge variant="secondary">{roomItems.length} items</Badge>
+                          <Badge variant="secondary">{currentRoomItems.length} items</Badge>
                         </CardTitle>
                         <p className="text-sm text-muted-foreground mt-1">
                           {roomVolume.toFixed(1)} cu ft • {roomWeight.toFixed(0)} lbs
@@ -641,7 +647,7 @@ export default function Review() {
                           </tr>
                         </thead>
                         <tbody>
-                          {roomItems.map((item) => (
+                          {currentRoomItems.map((item) => (
                             <tr key={item.id} className="border-b hover:bg-muted/50">
                               <td className="p-4">
                                  <div className="flex flex-col items-center gap-1">
