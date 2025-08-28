@@ -86,6 +86,70 @@ export default function Review() {
   // Debounce timer reference
   const debounceTimers = useRef<{ [key: string]: NodeJS.Timeout }>({});
 
+  // Debounced input handler to prevent re-renders on every keystroke
+  const handleDebouncedInputChange = useCallback((itemId: string, field: 'quantity' | 'volume' | 'weight', value: string) => {
+    // Update local editing state immediately for responsive UI
+    setEditingValues(prev => ({...prev, [`${itemId}-${field}`]: value}));
+
+    // Clear any existing debounce timer for this item
+    if (debounceTimers.current[`${itemId}-${field}`]) {
+      clearTimeout(debounceTimers.current[`${itemId}-${field}`]);
+    }
+
+    // Set a new timer to update the main state after a delay
+    debounceTimers.current[`${itemId}-${field}`] = setTimeout(() => {
+      // Convert the string value to a number
+      let numValue;
+      if (field === 'quantity') {
+        numValue = parseInt(value) || 1;
+      } else {
+        numValue = parseFloat(value) || 0;
+      }
+
+      // Update the main items state
+      setItems(prevItems => prevItems.map(item => item.id === itemId ? { ...item, [field]: numValue } : item));
+      setHasUnsavedChanges(true);
+      
+      // Clean up the editing value once it's applied
+      setEditingValues(prev => {
+        const newValues = {...prev};
+        delete newValues[`${itemId}-${field}`];
+        return newValues;
+      });
+    }, 500); // 500ms debounce time
+  }, []);
+
+  // Handle room changes immediately (no debounce needed for dropdowns)
+  const handleRoomChange = useCallback((itemId: string, room: string) => {
+    setItems(prevItems => prevItems.map(item => item.id === itemId ? { ...item, room } : item));
+    setHasUnsavedChanges(true);
+  }, []);
+
+  // Handle name changes with debouncing
+  const handleDebouncedNameChange = useCallback((itemId: string, value: string) => {
+    // Update local editing state immediately for responsive UI
+    setEditingValues(prev => ({...prev, [`${itemId}-name`]: value}));
+
+    // Clear any existing debounce timer for this item
+    if (debounceTimers.current[`${itemId}-name`]) {
+      clearTimeout(debounceTimers.current[`${itemId}-name`]);
+    }
+
+    // Set a new timer to update the main state after a delay
+    debounceTimers.current[`${itemId}-name`] = setTimeout(() => {
+      // Update the main items state
+      setItems(prevItems => prevItems.map(item => item.id === itemId ? { ...item, name: value } : item));
+      setHasUnsavedChanges(true);
+      
+      // Clean up the editing value once it's applied
+      setEditingValues(prev => {
+        const newValues = {...prev};
+        delete newValues[`${itemId}-name`];
+        return newValues;
+      });
+    }, 500); // 500ms debounce time
+  }, []);
+
   // Load inventory items from database
   useEffect(() => {
     const loadInventoryData = async () => {
@@ -263,30 +327,11 @@ export default function Review() {
     if (!sessionId) return;
 
     try {
-      // Apply any pending editing values to items first
-      let updatedItems = [...items];
-      Object.entries(editingValues).forEach(([key, value]) => {
-        const [itemId, field] = key.split('-');
-        const itemIndex = updatedItems.findIndex(item => item.id === itemId);
-        if (itemIndex !== -1) {
-          if (field === 'name' || field === 'room') {
-            updatedItems[itemIndex] = { ...updatedItems[itemIndex], [field]: value };
-          } else {
-            const numValue = field === 'quantity' ? parseInt(value) || 1 : parseFloat(value) || 0;
-            updatedItems[itemIndex] = { ...updatedItems[itemIndex], [field]: numValue };
-          }
-        }
-      });
-      
-      // Update state with final values
-      setItems(updatedItems);
-      setEditingValues({});
-      
-      // First recalculate everything
+      // Recalculate everything with current state
       recalculateAll();
       
       // Update all items in database
-      const updatePromises = updatedItems.map(item => 
+      const updatePromises = items.map(item => 
         supabase
           .from('inventory_items')
           .update({
@@ -306,7 +351,7 @@ export default function Review() {
       await updateSessionTotals();
       
       setHasUnsavedChanges(false);
-      toast.success('All changes updated and saved successfully');
+      toast.success('All changes saved successfully');
     } catch (error) {
       console.error('Error saving changes:', error);
       toast.error('Failed to save changes');
@@ -505,6 +550,15 @@ export default function Review() {
     }
   }, [selectedImage, currentImageIndex, selectedImageRoom]);
 
+  // Cleanup debounce timers on unmount
+  React.useEffect(() => {
+    return () => {
+      Object.values(debounceTimers.current).forEach(timer => {
+        if (timer) clearTimeout(timer);
+      });
+    };
+  }, []);
+
 
   return (
     <div className="min-h-screen bg-background">
@@ -688,24 +742,10 @@ export default function Review() {
                                        {editingItem === item.id ? (
                                           <Input
                                             value={editingValues[`${item.id}-name`] ?? item.name}
-                                            onChange={(e) => setEditingValues(prev => ({...prev, [`${item.id}-name`]: e.target.value}))}
+                                            onChange={(e) => handleDebouncedNameChange(item.id, e.target.value)}
                                             className="h-8"
-                                            onBlur={() => {
-                                              setEditingItem(null);
-                                              const newName = editingValues[`${item.id}-name`];
-                                              if (newName && newName !== item.name) {
-                                                updateItemLocally(item.id, { name: newName });
-                                              }
-                                            }}
-                                            onKeyDown={(e) => {
-                                              if (e.key === 'Enter') {
-                                                setEditingItem(null);
-                                                const newName = editingValues[`${item.id}-name`];
-                                                if (newName && newName !== item.name) {
-                                                  updateItemLocally(item.id, { name: newName });
-                                                }
-                                              }
-                                            }}
+                                            onBlur={() => setEditingItem(null)}
+                                            onKeyDown={(e) => e.key === 'Enter' && setEditingItem(null)}
                                             autoFocus
                                           />
                                         ) : (
@@ -724,44 +764,41 @@ export default function Review() {
                                     #{item.found_in_image || 'N/A'}
                                   </Badge>
                                </td>
-                                 <td className="p-4">
-                                   <Input
-                                     type="number"
-                                     value={editingValues[`${item.id}-quantity`] ?? item.quantity.toString()}
-                                     onChange={(e) => setEditingValues(prev => ({...prev, [`${item.id}-quantity`]: e.target.value}))}
-                                     className="h-8 w-16"
-                                     min="1"
-                                   />
-                                 </td>
-                                <td className="p-4">
-                                   <Input
-                                     type="number"
-                                     value={editingValues[`${item.id}-volume`] ?? item.volume.toString()}
-                                     onChange={(e) => setEditingValues(prev => ({...prev, [`${item.id}-volume`]: e.target.value}))}
-                                     className="h-8 w-20"
-                                     step="0.1"
-                                     min="0"
-                                   />
-                                 </td>
-                                <td className="p-4">
-                                   <Input
-                                     type="number"
-                                     value={editingValues[`${item.id}-weight`] ?? item.weight.toString()}
-                                     onChange={(e) => setEditingValues(prev => ({...prev, [`${item.id}-weight`]: e.target.value}))}
-                                     className="h-8 w-20"
-                                     step="0.5"
-                                     min="0"
-                                   />
+                                  <td className="p-4">
+                                    <Input
+                                      type="number"
+                                      value={editingValues[`${item.id}-quantity`] ?? item.quantity.toString()}
+                                      onChange={(e) => handleDebouncedInputChange(item.id, 'quantity', e.target.value)}
+                                      className="h-8 w-16"
+                                      min="1"
+                                    />
                                   </td>
                                  <td className="p-4">
-                                   <RoomDropdown
-                                     value={editingValues[`${item.id}-room`] ?? item.room}
-                                     onValueChange={(room) => {
-                                       setEditingValues(prev => ({...prev, [`${item.id}-room`]: room}));
-                                       setHasUnsavedChanges(true);
-                                     }}
-                                   />
-                                 </td>
+                                    <Input
+                                      type="number"
+                                      value={editingValues[`${item.id}-volume`] ?? item.volume.toString()}
+                                      onChange={(e) => handleDebouncedInputChange(item.id, 'volume', e.target.value)}
+                                      className="h-8 w-20"
+                                      step="0.1"
+                                      min="0"
+                                    />
+                                  </td>
+                                 <td className="p-4">
+                                    <Input
+                                      type="number"
+                                      value={editingValues[`${item.id}-weight`] ?? item.weight.toString()}
+                                      onChange={(e) => handleDebouncedInputChange(item.id, 'weight', e.target.value)}
+                                      className="h-8 w-20"
+                                      step="0.5"
+                                      min="0"
+                                    />
+                                   </td>
+                                  <td className="p-4">
+                                    <RoomDropdown
+                                      value={item.room}
+                                      onValueChange={(room) => handleRoomChange(item.id, room)}
+                                    />
+                                  </td>
                               <td className="p-4">
                                 <Button
                                   variant="ghost"
@@ -812,35 +849,35 @@ export default function Review() {
                               placeholder="e.g., Sofa, Box, Table"
                             />
                           </div>
-                          <div>
-                            <label className="text-sm font-medium mb-2 block">Quantity</label>
-                            <Input
-                              type="number"
-                              value={newItem.quantity || 1}
-                              onChange={(e) => setNewItem({...newItem, quantity: parseInt(e.target.value) || 1})}
-                              min="1"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-sm font-medium mb-2 block">Volume (cu ft)</label>
-                            <Input
-                              type="number"
-                              value={newItem.volume || 0}
-                              onChange={(e) => setNewItem({...newItem, volume: parseFloat(e.target.value) || 0})}
-                              step="0.1"
-                              min="0"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-sm font-medium mb-2 block">Weight (lbs)</label>
-                            <Input
-                              type="number"
-                              value={newItem.weight || 0}
-                              onChange={(e) => setNewItem({...newItem, weight: parseFloat(e.target.value) || 0})}
-                              step="0.5"
-                              min="0"
-                            />
-                          </div>
+                           <div>
+                             <label className="text-sm font-medium mb-2 block">Quantity</label>
+                             <Input
+                               type="number"
+                               value={newItem.quantity?.toString() || ''}
+                               onChange={(e) => setNewItem({...newItem, quantity: e.target.value === '' ? undefined : parseInt(e.target.value) || 1})}
+                               min="1"
+                             />
+                           </div>
+                           <div>
+                             <label className="text-sm font-medium mb-2 block">Volume (cu ft)</label>
+                             <Input
+                               type="number"
+                               value={newItem.volume?.toString() || ''}
+                               onChange={(e) => setNewItem({...newItem, volume: e.target.value === '' ? undefined : parseFloat(e.target.value) || 0})}
+                               step="0.1"
+                               min="0"
+                             />
+                           </div>
+                           <div>
+                             <label className="text-sm font-medium mb-2 block">Weight (lbs)</label>
+                             <Input
+                               type="number"
+                               value={newItem.weight?.toString() || ''}
+                               onChange={(e) => setNewItem({...newItem, weight: e.target.value === '' ? undefined : parseFloat(e.target.value) || 0})}
+                               step="0.5"
+                               min="0"
+                             />
+                           </div>
                         </div>
                         <div className="flex gap-2">
                           <Button onClick={addNewItem}>
