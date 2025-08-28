@@ -86,6 +86,9 @@ export default function Review() {
   // Inline editing state
   const [editingItem, setEditingItem] = useState<string | null>(null);
   const [editingValues, setEditingValues] = useState<Partial<InventoryItem>>({});
+  const [showAddRoomDialog, setShowAddRoomDialog] = useState(false);
+  const [newRoomName, setNewRoomName] = useState('');
+  const [addRoomMode, setAddRoomMode] = useState<'manual' | 'photo' | null>(null);
 
   // Load inventory items from database
   useEffect(() => {
@@ -220,6 +223,45 @@ export default function Review() {
   const cancelEditing = () => {
     setEditingItem(null);
     setEditingValues({});
+  };
+
+  const openAddRoomDialog = () => {
+    setShowAddRoomDialog(true);
+    setAddRoomMode(null);
+    setNewRoomName('');
+  };
+
+  const closeAddRoomDialog = () => {
+    setShowAddRoomDialog(false);
+    setAddRoomMode(null);
+    setNewRoomName('');
+  };
+
+  const handleAddRoomManual = () => {
+    if (!newRoomName.trim()) {
+      toast.error('Please enter a room name');
+      return;
+    }
+    setActiveAddFormRoom(newRoomName.trim());
+    setNewItem({
+      name: '',
+      quantity: 1,
+      volume: 0,
+      weight: 0,
+      room: newRoomName.trim(),
+      is_going: true
+    });
+    closeAddRoomDialog();
+  };
+
+  const handleAddRoomPhoto = () => {
+    if (!newRoomName.trim()) {
+      toast.error('Please enter a room name');
+      return;
+    }
+    // Store the room name and navigate to upload with room context
+    localStorage.setItem('pendingRoomName', newRoomName.trim());
+    navigate(sessionId ? `/upload?session=${sessionId}&room=${encodeURIComponent(newRoomName.trim())}` : `/upload?room=${encodeURIComponent(newRoomName.trim())}`);
   };
 
   const deleteItem = async (id: string) => {
@@ -481,7 +523,7 @@ export default function Review() {
         <div className="mb-8">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold">Inventory Items by Room</h2>
-            <Button onClick={() => {}}>
+            <Button onClick={openAddRoomDialog}>
               <Plus className="h-4 w-4 mr-2" />
               Add Room
             </Button>
@@ -788,6 +830,98 @@ export default function Review() {
         </div>
 
 
+
+        {/* Add Room Dialog */}
+        <Dialog open={showAddRoomDialog} onOpenChange={closeAddRoomDialog}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Add New Room</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-6">
+              {!addRoomMode ? (
+                <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    How would you like to add items to the new room?
+                  </p>
+                  <div className="grid grid-cols-1 gap-3">
+                    <Button 
+                      variant="outline" 
+                      className="h-20 flex-col gap-2"
+                      onClick={() => setAddRoomMode('manual')}
+                    >
+                      <Edit3 className="h-6 w-6" />
+                      <div className="text-center">
+                        <div className="font-medium">Manual Entry</div>
+                        <div className="text-xs text-muted-foreground">Add items manually</div>
+                      </div>
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      className="h-20 flex-col gap-2"
+                      onClick={() => setAddRoomMode('photo')}
+                    >
+                      <ImageIcon className="h-6 w-6" />
+                      <div className="text-center">
+                        <div className="font-medium">Upload Photos</div>
+                        <div className="text-xs text-muted-foreground">Analyze photos with AI</div>
+                      </div>
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => setAddRoomMode(null)}
+                    className="self-start p-0 h-auto"
+                  >
+                    ← Back
+                  </Button>
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Room Name *</label>
+                    <Input
+                      value={newRoomName}
+                      onChange={(e) => setNewRoomName(e.target.value)}
+                      placeholder="e.g., Master Bedroom, Kitchen, Garage"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          if (addRoomMode === 'manual') {
+                            handleAddRoomManual();
+                          } else {
+                            handleAddRoomPhoto();
+                          }
+                        }
+                      }}
+                      autoFocus
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={addRoomMode === 'manual' ? handleAddRoomManual : handleAddRoomPhoto}
+                      className="flex-1"
+                    >
+                      {addRoomMode === 'manual' ? (
+                        <>
+                          <Plus className="h-4 w-4 mr-2" />
+                          Create Room
+                        </>
+                      ) : (
+                        <>
+                          <ImageIcon className="h-4 w-4 mr-2" />
+                          Upload Photos
+                        </>
+                      )}
+                    </Button>
+                    <Button variant="outline" onClick={closeAddRoomDialog}>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Image Preview Dialog */}
         <Dialog open={selectedImage !== null} onOpenChange={closeImageGallery}>

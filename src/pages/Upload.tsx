@@ -24,6 +24,7 @@ const UploadPage = () => {
   const [analysisProgress, setAnalysisProgress] = useState({ current: 0, total: 0 });
   const [currentSession, setCurrentSession] = useState<any>(null);
   const [searchParams] = useSearchParams();
+  const [predefinedRoom, setPredefinedRoom] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   
@@ -36,8 +37,14 @@ const UploadPage = () => {
 
   useEffect(() => {
     const sessionId = searchParams.get('session');
+    const roomParam = searchParams.get('room');
+    
     if (sessionId) {
       loadExistingSession(sessionId);
+    }
+    
+    if (roomParam) {
+      setPredefinedRoom(decodeURIComponent(roomParam));
     }
   }, [searchParams]);
 
@@ -206,38 +213,54 @@ const UploadPage = () => {
 
       const uploadedFiles = await Promise.all(uploadPromises);
       
-      // TWO-PASS ANALYSIS SYSTEM
+      // TWO-PASS ANALYSIS SYSTEM (or single room assignment if predefined room)
       
-      // PASS 1: Room Detection
-      setCurrentStep('room-detection');
-      toast.info("Step 1: Detecting rooms across all images...", { duration: 3000 });
+      let roomMappings: Record<number, string> = {};
+      let detectedRooms: string[] = [];
       
-      const allBase64Images = await Promise.all(
-        files.map(file => convertFileToBase64(file.file))
-      );
-      
-      const { data: roomData, error: roomError } = await supabase.functions.invoke('analyze-inventory', {
-        body: { 
-          mode: 'room-detection',
-          images: allBase64Images
+      if (predefinedRoom) {
+        // If we have a predefined room, assign all images to that room
+        setCurrentStep('room-assignment');
+        toast.info(`Assigning all photos to room: ${predefinedRoom}...`, { duration: 2000 });
+        
+        for (let i = 1; i <= files.length; i++) {
+          roomMappings[i] = predefinedRoom;
         }
-      });
+        detectedRooms = [predefinedRoom];
+        setRoomsDetected([predefinedRoom]);
+        toast.success(`✓ All photos assigned to: ${predefinedRoom}`, { duration: 3000 });
+      } else {
+        // PASS 1: Room Detection (original logic)
+        setCurrentStep('room-detection');
+        toast.info("Step 1: Detecting rooms across all images...", { duration: 3000 });
+        
+        const allBase64Images = await Promise.all(
+          files.map(file => convertFileToBase64(file.file))
+        );
+        
+        const { data: roomData, error: roomError } = await supabase.functions.invoke('analyze-inventory', {
+          body: { 
+            mode: 'room-detection',
+            images: allBase64Images
+          }
+        });
 
-      if (roomError) {
-        console.error('Room detection error:', roomError);
-        toast.error('Failed to detect rooms. Using default room assignment.');
+        if (roomError) {
+          console.error('Room detection error:', roomError);
+          toast.error('Failed to detect rooms. Using default room assignment.');
+        }
+
+        roomMappings = roomData?.image_room_mapping || {};
+        detectedRooms = roomData?.rooms_detected || [];
+        
+        console.log('Room detection results:', { roomMappings, detectedRooms });
+        setRoomsDetected(detectedRooms);
+        toast.success(`✓ Detected ${detectedRooms.length} rooms: ${detectedRooms.join(', ')}`, { duration: 4000 });
       }
-
-      const roomMappings = roomData?.image_room_mapping || {};
-      const detectedRooms = roomData?.rooms_detected || [];
-      
-      console.log('Room detection results:', { roomMappings, detectedRooms });
-      setRoomsDetected(detectedRooms);
-      toast.success(`✓ Detected ${detectedRooms.length} rooms: ${detectedRooms.join(', ')}`, { duration: 4000 });
       
       // PASS 2: Item Analysis with Room Context
       setCurrentStep('item-analysis');
-      toast.info("Step 2: Analyzing items with room context...", { duration: 2000 });
+      toast.info(`${predefinedRoom ? 'Analyzing items in' : 'Step 2: Analyzing items with room context in'} ${predefinedRoom || 'detected rooms'}...`, { duration: 2000 });
       setAnalysisProgress({ current: 0, total: files.length });
       let allItems: any[] = [];
       
@@ -391,20 +414,32 @@ const UploadPage = () => {
 
           <div className="max-w-4xl mx-auto">
             {/* Session Info */}
-            {currentSession && (
+            {(currentSession || predefinedRoom) && (
               <div className="mb-6 p-4 bg-primary/10 border border-primary/20 rounded-lg">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="font-semibold text-primary">Continuing Session</h3>
-                    <p className="text-sm text-muted-foreground">{currentSession.name}</p>
+                    {currentSession && (
+                      <>
+                        <h3 className="font-semibold text-primary">Continuing Session</h3>
+                        <p className="text-sm text-muted-foreground">{currentSession.name}</p>
+                      </>
+                    )}
+                    {predefinedRoom && (
+                      <>
+                        <h3 className="font-semibold text-primary">Adding to Room: {predefinedRoom}</h3>
+                        <p className="text-sm text-muted-foreground">All photos will be analyzed for this room</p>
+                      </>
+                    )}
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => navigate(`/review?session=${currentSession.id}`)}
-                  >
-                    View Existing Items
-                  </Button>
+                  {currentSession && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate(`/review?session=${currentSession.id}`)}
+                    >
+                      View Existing Items
+                    </Button>
+                  )}
                 </div>
               </div>
             )}
