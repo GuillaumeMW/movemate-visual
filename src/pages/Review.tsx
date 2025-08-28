@@ -490,7 +490,7 @@ export default function Review() {
       <div className="container mx-auto px-4 py-8 max-w-6xl">
         <div className="mb-8">
           <p className="text-muted-foreground">
-            Review and edit the items we detected. Don't forget to add boxes
+            Review and edit the items we detected. Don't forget to add boxes.
           </p>
         </div>
 
