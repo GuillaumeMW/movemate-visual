@@ -192,7 +192,7 @@ export default function Review() {
   };
 
   // Debounced version of updateItem for numeric inputs
-  const debouncedUpdateItem = useCallback((id: string, updates: Partial<InventoryItem>, delay: number = 500) => {
+  const debouncedUpdateItem = useCallback((id: string, updates: Partial<InventoryItem>, delay: number = 1500) => {
     // Clear existing timer for this item
     if (debounceTimers.current[id]) {
       clearTimeout(debounceTimers.current[id]);
