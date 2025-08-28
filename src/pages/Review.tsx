@@ -409,6 +409,43 @@ export default function Review() {
                     </div>
                   </CardHeader>
                   <CardContent className="p-0">
+                    {/* Room Photos */}
+                    {roomPhotos.length > 0 && (
+                      <div className="p-4 border-b">
+                        <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                          <ImageIcon className="h-4 w-4" />
+                          Photos from this room ({roomPhotos.length})
+                        </h4>
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                          {roomPhotos.map((image, index) => (
+                            <div
+                              key={image.id}
+                              className="relative group cursor-pointer"
+                              onClick={() => setSelectedImage(getImageUrl(image.file_path))}
+                            >
+                              <img
+                                src={getImageUrl(image.file_path)}
+                                alt={image.file_name}
+                                className="w-full h-20 object-cover rounded-md border hover:border-primary transition-colors"
+                              />
+                               <div className="absolute top-1 left-1">
+                                 <Badge variant="secondary" className="text-xs font-bold bg-white/90 text-black">
+                                   #{image.file_path.split('_')[1] || index + 1}
+                                 </Badge>
+                               </div>
+                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors rounded-md flex items-center justify-center">
+                                <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <div className="bg-white/90 p-1 rounded text-xs font-medium">
+                                    Click to view
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     <div className="overflow-x-auto">
                       <table className="w-full">
                         <thead className="border-b">
@@ -515,43 +552,6 @@ export default function Review() {
                         </tbody>
                       </table>
                     </div>
-
-                    {/* Room Photos */}
-                    {roomPhotos.length > 0 && (
-                      <div className="border-t p-4">
-                        <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
-                          <ImageIcon className="h-4 w-4" />
-                          Photos from this room ({roomPhotos.length})
-                        </h4>
-                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                          {roomPhotos.map((image, index) => (
-                            <div
-                              key={image.id}
-                              className="relative group cursor-pointer"
-                              onClick={() => setSelectedImage(getImageUrl(image.file_path))}
-                            >
-                              <img
-                                src={getImageUrl(image.file_path)}
-                                alt={image.file_name}
-                                className="w-full h-20 object-cover rounded-md border hover:border-primary transition-colors"
-                              />
-                               <div className="absolute top-1 left-1">
-                                 <Badge variant="secondary" className="text-xs font-bold bg-white/90 text-black">
-                                   #{image.file_path.split('_')[1] || index + 1}
-                                 </Badge>
-                               </div>
-                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors rounded-md flex items-center justify-center">
-                                <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <div className="bg-white/90 p-1 rounded text-xs font-medium">
-                                    Click to view
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
                   </CardContent>
                 </Card>
               );
