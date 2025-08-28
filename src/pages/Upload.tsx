@@ -188,10 +188,24 @@ const UploadPage = () => {
         session = newSession;
       }
 
+      // Get the highest existing image number first to continue numbering
+      const { data: existingImages, error: existingError } = await supabase
+        .from('inventory_items')
+        .select('found_in_image')
+        .eq('session_id', session.id)
+        .not('found_in_image', 'is', null);
+      
+      let startingImageNumber = 1;
+      if (!existingError && existingImages && existingImages.length > 0) {
+        const maxImageNumber = Math.max(...existingImages.map(item => item.found_in_image || 0));
+        startingImageNumber = maxImageNumber + 1;
+      }
+
       // Upload files to Supabase Storage and track them
       const uploadPromises = files.map(async (file, index) => {
         const fileExt = file.file.name.split('.').pop();
-        const fileName = `${session.id}_${index + 1}_${Date.now()}.${fileExt}`;
+        const imageNumber = startingImageNumber + index;
+        const fileName = `${session.id}_${imageNumber}_${Date.now()}.${fileExt}`;
         
         const { error: uploadError } = await supabase.storage
           .from('inventory-images')
@@ -217,19 +231,6 @@ const UploadPage = () => {
       
       let roomMappings: Record<number, string> = {};
       let detectedRooms: string[] = [];
-      
-      // Get the highest existing image number first (needed for both paths)
-      const { data: existingItems, error: existingError } = await supabase
-        .from('inventory_items')
-        .select('found_in_image')
-        .eq('session_id', session.id)
-        .not('found_in_image', 'is', null);
-      
-      let startingImageNumber = 1;
-      if (!existingError && existingItems && existingItems.length > 0) {
-        const maxImageNumber = Math.max(...existingItems.map(item => item.found_in_image || 0));
-        startingImageNumber = maxImageNumber + 1;
-      }
       
       if (predefinedRoom) {
         // If we have a predefined room, assign all images to that room
