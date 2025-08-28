@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -83,8 +83,9 @@ export default function Review() {
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
   
-  // Debounce timer reference
-  const debounceTimers = useRef<{ [key: string]: NodeJS.Timeout }>({});
+  // Inline editing state
+  const [editingItem, setEditingItem] = useState<string | null>(null);
+  const [editingValues, setEditingValues] = useState<Partial<InventoryItem>>({});
 
   // Load inventory items from database
   useEffect(() => {
@@ -153,7 +154,6 @@ export default function Review() {
     loadInventoryData();
   }, [sessionId]);
   
-  const [editingItem, setEditingItem] = useState<string | null>(null);
   const [activeAddFormRoom, setActiveAddFormRoom] = useState<string | null>(null);
   const [newItem, setNewItem] = useState<Partial<InventoryItem>>({
     name: '',
@@ -183,7 +183,6 @@ export default function Review() {
       }
       
       setItems(items.map(item => item.id === id ? { ...item, ...updates } : item));
-      setEditingItem(null);
       toast.success('Item updated');
     } catch (error) {
       console.error('Error updating item:', error);
@@ -191,51 +190,37 @@ export default function Review() {
     }
   };
 
-  // Debounced version of updateItem for numeric inputs
-  const debouncedUpdateItem = useCallback((id: string, updates: Partial<InventoryItem>, delay: number = 1500) => {
-    // Clear existing timer for this item
-    if (debounceTimers.current[id]) {
-      clearTimeout(debounceTimers.current[id]);
-    }
+  const startEditing = (item: InventoryItem) => {
+    setEditingItem(item.id);
+    setEditingValues({
+      name: item.name,
+      quantity: item.quantity,
+      volume: item.volume,
+      weight: item.weight,
+      room: item.room
+    });
+  };
+
+  const saveEditing = async () => {
+    if (!editingItem) return;
     
-    // Update local state immediately for responsive UI
-    setItems(prev => prev.map(item => item.id === id ? { ...item, ...updates } : item));
+    const updates: Partial<InventoryItem> = {
+      name: editingValues.name,
+      quantity: editingValues.quantity,
+      volume: editingValues.volume,
+      weight: editingValues.weight,
+      room: editingValues.room
+    };
     
-    // Set new timer to update database after delay
-    debounceTimers.current[id] = setTimeout(async () => {
-      try {
-        if (sessionId) {
-          const { error } = await supabase
-            .from('inventory_items')
-            .update(updates)
-            .eq('id', id);
-          
-          if (error) throw error;
-          
-          // Update session totals
-          await updateSessionTotals();
-          
-          // Show success notification
-          toast.success('Changes saved automatically');
-        }
-      } catch (error) {
-        console.error('Error updating item:', error);
-        toast.error('Failed to update item');
-        // Revert local state on error
-        const { data: originalItem } = await supabase
-          .from('inventory_items')
-          .select('*')
-          .eq('id', id)
-          .single();
-        if (originalItem) {
-          setItems(prev => prev.map(item => item.id === id ? originalItem : item));
-        }
-      }
-      
-      // Clean up timer reference
-      delete debounceTimers.current[id];
-    }, delay);
-  }, [sessionId, items]);
+    await updateItem(editingItem, updates);
+    setEditingItem(null);
+    setEditingValues({});
+  };
+
+  const cancelEditing = () => {
+    setEditingItem(null);
+    setEditingValues({});
+  };
 
   const deleteItem = async (id: string) => {
     try {
@@ -594,92 +579,127 @@ export default function Review() {
                         </thead>
                         <tbody>
                           {roomItems.map((item) => (
-                            <tr key={item.id} className="border-b hover:bg-muted/50">
-                              <td className="p-4">
-                                <div className="flex flex-col items-center gap-1">
-                                  <Switch
-                                    checked={item.is_going !== false}
-                                    onCheckedChange={(checked) => updateItem(item.id, { is_going: checked })}
-                                  />
-                                  <span className="text-xs text-muted-foreground">
-                                    {item.is_going !== false ? 'Going' : 'Not going'}
-                                  </span>
-                                </div>
-                              </td>
+                             <tr key={item.id} className="border-b hover:bg-muted/50">
                                <td className="p-4">
-                                 <div className="flex items-center gap-3">
-                                   <div>
-                                      {editingItem === item.id ? (
-                                        <Input
-                                          value={item.name}
-                                          onChange={(e) => updateItem(item.id, { name: e.target.value })}
-                                          className="h-8"
-                                          onBlur={() => setEditingItem(null)}
-                                          onKeyDown={(e) => e.key === 'Enter' && setEditingItem(null)}
-                                          autoFocus
-                                        />
-                                      ) : (
-                                        <div 
-                                          className="font-medium cursor-pointer hover:text-primary"
-                                          onClick={() => setEditingItem(item.id)}
-                                        >
-                                          {item.name}
-                                        </div>
-                                      )}
-                                   </div>
+                                 <div className="flex flex-col items-center gap-1">
+                                   <Switch
+                                     checked={item.is_going !== false}
+                                     onCheckedChange={(checked) => updateItem(item.id, { is_going: checked })}
+                                   />
+                                   <span className="text-xs text-muted-foreground">
+                                     {item.is_going !== false ? 'Going' : 'Not going'}
+                                   </span>
                                  </div>
                                </td>
-                               <td className="p-4">
-                                  <Badge variant="outline" className="text-xs">
-                                    #{item.found_in_image || 'N/A'}
-                                  </Badge>
-                               </td>
-                               <td className="p-4">
-                                 <Input
-                                   type="number"
-                                   value={item.quantity}
-                                   onChange={(e) => debouncedUpdateItem(item.id, { quantity: parseInt(e.target.value) || 1 })}
-                                   className="h-8 w-16"
-                                   min="1"
-                                 />
-                               </td>
-                               <td className="p-4">
-                                 <Input
-                                   type="number"
-                                   value={item.volume}
-                                   onChange={(e) => debouncedUpdateItem(item.id, { volume: parseFloat(e.target.value) || 0 })}
-                                   className="h-8 w-20"
-                                   step="0.1"
-                                   min="0"
-                                 />
-                               </td>
-                               <td className="p-4">
-                                 <Input
-                                   type="number"
-                                   value={item.weight}
-                                   onChange={(e) => debouncedUpdateItem(item.id, { weight: parseFloat(e.target.value) || 0 })}
-                                   className="h-8 w-20"
-                                   step="0.5"
-                                   min="0"
-                                 />
+                                <td className="p-4">
+                                  {editingItem === item.id ? (
+                                    <Input
+                                      value={editingValues.name || ''}
+                                      onChange={(e) => setEditingValues(prev => ({ ...prev, name: e.target.value }))}
+                                      className="h-8"
+                                      autoFocus
+                                    />
+                                  ) : (
+                                    <div className="font-medium">{item.name}</div>
+                                  )}
+                                </td>
+                                <td className="p-4">
+                                   <Badge variant="outline" className="text-xs">
+                                     #{item.found_in_image || 'N/A'}
+                                   </Badge>
+                                </td>
+                                <td className="p-4">
+                                  {editingItem === item.id ? (
+                                    <Input
+                                      type="number"
+                                      value={editingValues.quantity || ''}
+                                      onChange={(e) => setEditingValues(prev => ({ ...prev, quantity: parseInt(e.target.value) || 1 }))}
+                                      className="h-8 w-16"
+                                    />
+                                  ) : (
+                                    <div>{item.quantity}</div>
+                                  )}
+                                </td>
+                                <td className="p-4">
+                                  {editingItem === item.id ? (
+                                    <Input
+                                      type="number"
+                                      value={editingValues.volume || ''}
+                                      onChange={(e) => setEditingValues(prev => ({ ...prev, volume: parseFloat(e.target.value) || 0 }))}
+                                      className="h-8 w-20"
+                                      step="0.1"
+                                    />
+                                  ) : (
+                                    <div>{item.volume}</div>
+                                  )}
+                                </td>
+                                <td className="p-4">
+                                  {editingItem === item.id ? (
+                                    <Input
+                                      type="number"
+                                      value={editingValues.weight || ''}
+                                      onChange={(e) => setEditingValues(prev => ({ ...prev, weight: parseFloat(e.target.value) || 0 }))}
+                                      className="h-8 w-20"
+                                      step="0.5"
+                                    />
+                                  ) : (
+                                    <div>{item.weight}</div>
+                                  )}
+                                 </td>
+                                <td className="p-4">
+                                  {editingItem === item.id ? (
+                                    <RoomDropdown
+                                      value={editingValues.room}
+                                      onValueChange={(room) => setEditingValues(prev => ({ ...prev, room }))}
+                                    />
+                                  ) : (
+                                    <div>{item.room || 'Unassigned'}</div>
+                                  )}
                                 </td>
                                <td className="p-4">
-                                 <RoomDropdown
-                                   value={item.room}
-                                   onValueChange={(room) => updateItem(item.id, { room })}
-                                 />
+                                 <div className="flex gap-1">
+                                   {editingItem === item.id ? (
+                                     <>
+                                       <Button
+                                         variant="ghost"
+                                         size="sm"
+                                         onClick={saveEditing}
+                                         className="text-green-600 hover:text-green-700"
+                                       >
+                                         <Save className="h-4 w-4" />
+                                       </Button>
+                                       <Button
+                                         variant="ghost"
+                                         size="sm"
+                                         onClick={cancelEditing}
+                                         className="text-gray-600 hover:text-gray-700"
+                                       >
+                                         <X className="h-4 w-4" />
+                                       </Button>
+                                     </>
+                                   ) : (
+                                     <>
+                                       <Button
+                                         variant="ghost"
+                                         size="sm"
+                                         onClick={() => startEditing(item)}
+                                         className="text-blue-600 hover:text-blue-700"
+                                       >
+                                         <Edit3 className="h-4 w-4" />
+                                       </Button>
+                                       <Button
+                                         variant="ghost"
+                                         size="sm"
+                                         onClick={() => deleteItem(item.id)}
+                                         className="text-destructive hover:text-destructive"
+                                       >
+                                         <Trash2 className="h-4 w-4" />
+                                       </Button>
+                                     </>
+                                   )}
+                                 </div>
                                </td>
-                              <td className="p-4">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => deleteItem(item.id)}
-                                  className="text-destructive hover:text-destructive"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </td>
-                            </tr>
+                             </tr>
                           ))}
                         </tbody>
                       </table>
