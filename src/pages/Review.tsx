@@ -167,9 +167,60 @@ export default function Review() {
   // Track unsaved changes
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  const totalVolume = items.reduce((sum, item) => sum + (item.volume * item.quantity), 0);
-  const totalWeight = items.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
-  const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
+  // Cached calculations - only update when user clicks "Update & Save"
+  const [cachedTotals, setCachedTotals] = useState({
+    totalVolume: 0,
+    totalWeight: 0,
+    totalItems: 0,
+    roomGroups: {} as Record<string, InventoryItem[]>,
+    roomStats: {} as Record<string, { volume: number; weight: number; photos: UploadedImage[] }>
+  });
+
+  // Recalculate all expensive operations
+  const recalculateAll = useCallback(() => {
+    const totalVolume = items.reduce((sum, item) => sum + (item.volume * item.quantity), 0);
+    const totalWeight = items.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
+    const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
+
+    // Group items by room
+    const roomGroups = items.reduce((groups, item) => {
+      const room = item.room || 'Unassigned';
+      if (!groups[room]) groups[room] = [];
+      groups[room].push(item);
+      return groups;
+    }, {} as Record<string, InventoryItem[]>);
+
+    // Calculate room stats
+    const roomStats: Record<string, { volume: number; weight: number; photos: UploadedImage[] }> = {};
+    Object.entries(roomGroups).forEach(([room, roomItems]) => {
+      const roomVolume = roomItems.reduce((sum, item) => sum + (item.volume * item.quantity), 0);
+      const roomWeight = roomItems.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
+      
+      // Get photos for this room
+      const imageNumbers = new Set(roomItems.map(item => item.found_in_image).filter(Boolean));
+      const roomPhotos = uploadedImages.filter(img => {
+        const imgNumber = parseInt(img.file_path.split('_')[1]) || 0;
+        return imageNumbers.has(imgNumber);
+      });
+
+      roomStats[room] = { volume: roomVolume, weight: roomWeight, photos: roomPhotos };
+    });
+
+    setCachedTotals({
+      totalVolume,
+      totalWeight,
+      totalItems,
+      roomGroups,
+      roomStats
+    });
+  }, [items, uploadedImages]);
+
+  // Initial calculation when data loads
+  useEffect(() => {
+    if (!isLoading) {
+      recalculateAll();
+    }
+  }, [recalculateAll, isLoading]);
 
   const updateItem = async (id: string, updates: Partial<InventoryItem>) => {
     try {
@@ -200,11 +251,14 @@ export default function Review() {
     setHasUnsavedChanges(true);
   }, []);
 
-  // Save all changes to database
-  const saveChanges = async () => {
+  // Update & Save all changes to database
+  const updateAndSave = async () => {
     if (!sessionId || !hasUnsavedChanges) return;
 
     try {
+      // First recalculate everything
+      recalculateAll();
+      
       // Update all items in database
       const updatePromises = items.map(item => 
         supabase
@@ -226,7 +280,7 @@ export default function Review() {
       await updateSessionTotals();
       
       setHasUnsavedChanges(false);
-      toast.success('All changes saved successfully');
+      toast.success('All changes updated and saved successfully');
     } catch (error) {
       console.error('Error saving changes:', error);
       toast.error('Failed to save changes');
@@ -438,10 +492,15 @@ export default function Review() {
               </p>
             </div>
             {sessionId && hasUnsavedChanges && (
-              <Button onClick={saveChanges} className="flex items-center gap-2">
-                <Save className="h-4 w-4" />
-                Save Changes
-              </Button>
+              <div className="flex flex-col items-end gap-2">
+                <p className="text-xs text-muted-foreground">
+                  Totals may be outdated - click Update & Save to refresh
+                </p>
+                <Button onClick={updateAndSave} className="flex items-center gap-2">
+                  <Save className="h-4 w-4" />
+                  Update & Save
+                </Button>
+              </div>
             )}
           </div>
         </div>
@@ -450,19 +509,19 @@ export default function Review() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <Card>
             <CardContent className="p-6">
-              <div className="text-2xl font-bold">{totalItems}</div>
+              <div className="text-2xl font-bold">{cachedTotals.totalItems}</div>
               <p className="text-sm text-muted-foreground">Total Items</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-6">
-              <div className="text-2xl font-bold">{totalVolume.toFixed(1)} cu ft</div>
+              <div className="text-2xl font-bold">{cachedTotals.totalVolume.toFixed(1)} cu ft</div>
               <p className="text-sm text-muted-foreground">Total Volume</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-6">
-              <div className="text-2xl font-bold">{totalWeight.toFixed(0)} lbs</div>
+              <div className="text-2xl font-bold">{cachedTotals.totalWeight.toFixed(0)} lbs</div>
               <p className="text-sm text-muted-foreground">Total Weight</p>
             </CardContent>
           </Card>
@@ -508,28 +567,11 @@ export default function Review() {
             </Button>
           </div>
 
-          {(() => {
-            // Group items by room
-            const roomGroups = items.reduce((groups, item) => {
-              const room = item.room || 'Unassigned';
-              if (!groups[room]) groups[room] = [];
-              groups[room].push(item);
-              return groups;
-            }, {} as Record<string, InventoryItem[]>);
-
-            // Get photos for each room
-            const getRoomPhotos = (roomItems: InventoryItem[]) => {
-              const imageNumbers = new Set(roomItems.map(item => item.found_in_image).filter(Boolean));
-              return uploadedImages.filter(img => {
-                const imgNumber = parseInt(img.file_path.split('_')[1]) || 0;
-                return imageNumbers.has(imgNumber);
-              });
-            };
-
-            return Object.entries(roomGroups).map(([room, roomItems]) => {
-              const roomPhotos = getRoomPhotos(roomItems);
-              const roomVolume = roomItems.reduce((sum, item) => sum + (item.volume * item.quantity), 0);
-              const roomWeight = roomItems.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
+          {Object.entries(cachedTotals.roomGroups).map(([room, roomItems]) => {
+            const roomStats = cachedTotals.roomStats[room];
+            const roomPhotos = roomStats?.photos || [];
+            const roomVolume = roomStats?.volume || 0;
+            const roomWeight = roomStats?.weight || 0;
 
               return (
                 <Card key={room} className="mb-6">
@@ -767,11 +809,10 @@ export default function Review() {
                       </div>
                     )}
                   </CardContent>
-                </Card>
-              );
-            });
-          })()}
-        </div>
+                 </Card>
+               );
+             })}
+         </div>
 
 
 
