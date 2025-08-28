@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Trash2, Edit3, Plus, Save, X, Image as ImageIcon } from 'lucide-react';
+import { Trash2, Edit3, Plus, Save, X, Image as ImageIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { RoomDropdown } from '@/components/RoomDropdown';
@@ -79,6 +79,8 @@ export default function Review() {
   const [sessionInfo, setSessionInfo] = useState<any>(null);
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedImageRoom, setSelectedImageRoom] = useState<string | null>(null);
+  const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
 
   // Load inventory items from database
@@ -297,6 +299,63 @@ export default function Review() {
     return data.publicUrl;
   };
 
+  const openImageGallery = (imageUrl: string, room: string, roomPhotos: UploadedImage[], clickedImageIndex: number) => {
+    setSelectedImage(imageUrl);
+    setSelectedImageRoom(room);
+    setCurrentImageIndex(clickedImageIndex);
+  };
+
+  const closeImageGallery = () => {
+    setSelectedImage(null);
+    setSelectedImageRoom(null);
+    setCurrentImageIndex(0);
+  };
+
+  const navigateImage = (direction: 'prev' | 'next') => {
+    if (!selectedImageRoom) return;
+    
+    // Get current room's photos
+    const roomItems = items.filter(item => (item.room || 'Unassigned') === selectedImageRoom);
+    const imageNumbers = new Set(roomItems.map(item => item.found_in_image).filter(Boolean));
+    const roomPhotos = uploadedImages.filter(img => {
+      const imgNumber = parseInt(img.file_path.split('_')[1]) || 0;
+      return imageNumbers.has(imgNumber);
+    });
+
+    if (roomPhotos.length <= 1) return;
+
+    let newIndex;
+    if (direction === 'next') {
+      newIndex = (currentImageIndex + 1) % roomPhotos.length;
+    } else {
+      newIndex = currentImageIndex === 0 ? roomPhotos.length - 1 : currentImageIndex - 1;
+    }
+
+    setCurrentImageIndex(newIndex);
+    setSelectedImage(getImageUrl(roomPhotos[newIndex].file_path));
+  };
+
+  // Keyboard navigation
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (!selectedImage) return;
+    
+    if (e.key === 'ArrowLeft') {
+      navigateImage('prev');
+    } else if (e.key === 'ArrowRight') {
+      navigateImage('next');
+    } else if (e.key === 'Escape') {
+      closeImageGallery();
+    }
+  };
+
+  // Add keyboard event listener
+  React.useEffect(() => {
+    if (selectedImage) {
+      document.addEventListener('keydown', handleKeyDown);
+      return () => document.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [selectedImage, currentImageIndex, selectedImageRoom]);
+
 
   return (
     <div className="min-h-screen bg-background">
@@ -421,7 +480,7 @@ export default function Review() {
                             <div
                               key={image.id}
                               className="relative group cursor-pointer"
-                              onClick={() => setSelectedImage(getImageUrl(image.file_path))}
+                              onClick={() => openImageGallery(getImageUrl(image.file_path), room, roomPhotos, index)}
                             >
                               <img
                                 src={getImageUrl(image.file_path)}
@@ -636,13 +695,66 @@ export default function Review() {
 
 
         {/* Image Preview Dialog */}
-        <Dialog open={selectedImage !== null} onOpenChange={() => setSelectedImage(null)}>
+        <Dialog open={selectedImage !== null} onOpenChange={closeImageGallery}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
             <DialogHeader>
-              <DialogTitle>Photo Preview</DialogTitle>
+              <DialogTitle className="flex items-center justify-between">
+                <span>Photo Preview {selectedImageRoom && `- ${selectedImageRoom}`}</span>
+                {(() => {
+                  if (!selectedImageRoom) return null;
+                  const roomItems = items.filter(item => (item.room || 'Unassigned') === selectedImageRoom);
+                  const imageNumbers = new Set(roomItems.map(item => item.found_in_image).filter(Boolean));
+                  const roomPhotos = uploadedImages.filter(img => {
+                    const imgNumber = parseInt(img.file_path.split('_')[1]) || 0;
+                    return imageNumbers.has(imgNumber);
+                  });
+                  
+                  if (roomPhotos.length > 1) {
+                    return (
+                      <span className="text-sm text-muted-foreground font-normal">
+                        {currentImageIndex + 1} of {roomPhotos.length}
+                      </span>
+                    );
+                  }
+                  return null;
+                })()}
+              </DialogTitle>
             </DialogHeader>
             {selectedImage && (
-              <div className="flex items-center justify-center p-4">
+              <div className="relative flex items-center justify-center p-4">
+                {(() => {
+                  if (!selectedImageRoom) return null;
+                  const roomItems = items.filter(item => (item.room || 'Unassigned') === selectedImageRoom);
+                  const imageNumbers = new Set(roomItems.map(item => item.found_in_image).filter(Boolean));
+                  const roomPhotos = uploadedImages.filter(img => {
+                    const imgNumber = parseInt(img.file_path.split('_')[1]) || 0;
+                    return imageNumbers.has(imgNumber);
+                  });
+                  
+                  if (roomPhotos.length > 1) {
+                    return (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-background/80 hover:bg-background"
+                          onClick={() => navigateImage('prev')}
+                        >
+                          <ChevronLeft className="h-6 w-6" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-background/80 hover:bg-background"
+                          onClick={() => navigateImage('next')}
+                        >
+                          <ChevronRight className="h-6 w-6" />
+                        </Button>
+                      </>
+                    );
+                  }
+                  return null;
+                })()}
                 <img
                   src={selectedImage}
                   alt="Selected photo"
