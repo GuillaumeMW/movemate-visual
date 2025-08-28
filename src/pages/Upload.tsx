@@ -264,16 +264,30 @@ const UploadPage = () => {
       setAnalysisProgress({ current: 0, total: files.length });
       let allItems: any[] = [];
       
+      // Get the highest existing image number to continue numbering from there
+      const { data: existingItems, error: existingError } = await supabase
+        .from('inventory_items')
+        .select('found_in_image')
+        .eq('session_id', session.id)
+        .not('found_in_image', 'is', null);
+      
+      let startingImageNumber = 1;
+      if (!existingError && existingItems && existingItems.length > 0) {
+        const maxImageNumber = Math.max(...existingItems.map(item => item.found_in_image || 0));
+        startingImageNumber = maxImageNumber + 1;
+      }
+      
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         setAnalysisProgress({ current: i + 1, total: files.length });
         setCurrentImage(i + 1);
         
-        // Get room for this image
+        // Get room for this image (use the correct image number for room mapping)
+        const currentImageNumber = startingImageNumber + i;
         const imageRoom = roomMappings[i + 1] || 'unknown room';
         setCurrentRoom(imageRoom);
         
-        toast.info(`Analyzing image ${i + 1} of ${files.length}...`, { 
+        toast.info(`Analyzing image ${currentImageNumber} of ${startingImageNumber + files.length - 1}...`, { 
           duration: 1000,
           id: 'analysis-progress'
         });
@@ -287,31 +301,31 @@ const UploadPage = () => {
             body: { 
               mode: 'item-analysis',
               image: base64Image,
-              imageNumber: i + 1,
+              imageNumber: currentImageNumber,
               existingItems: allItems,
               roomMappings: roomMappings
             }
           });
 
           if (error) {
-            console.error(`Error analyzing image ${i + 1}:`, error);
-            toast.error(`Failed to analyze image ${i + 1}`);
+            console.error(`Error analyzing image ${currentImageNumber}:`, error);
+            toast.error(`Failed to analyze image ${currentImageNumber}`);
             continue;
           }
 
           if (data.items && data.items.length > 0) {
             allItems.push(...data.items);
             setItemsFound(data.items.length);
-            toast.success(`✓ Found ${data.items.length} items in image ${i + 1}`, { 
+            toast.success(`✓ Found ${data.items.length} items in image ${currentImageNumber}`, { 
               duration: 2000 
             });
           } else {
             setItemsFound(0);
-            toast.info(`No items found in image ${i + 1}`, { duration: 1500 });
+            toast.info(`No items found in image ${currentImageNumber}`, { duration: 1500 });
           }
         } catch (imageError) {
-          console.error(`Error processing image ${i + 1}:`, imageError);
-          toast.error(`Failed to process image ${i + 1}`);
+          console.error(`Error processing image ${currentImageNumber}:`, imageError);
+          toast.error(`Failed to process image ${currentImageNumber}`);
         }
       }
 
