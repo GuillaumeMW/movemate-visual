@@ -70,10 +70,15 @@ CRITICAL INSTRUCTIONS:
 
 BOX GROUPING INSTRUCTIONS:
 Items that would normally be moved in boxes should be combined into box estimates:
-- Small Boxes (1.5 cu ft): Books, CDs, DVDs, kitchen gadgets → estimate number of small boxes needed
-- Medium Boxes (3 cu ft): Clothing, towels, decorative items, small appliances → estimate medium boxes
-- Large Boxes (4.5 cu ft): Bedding, linens, larger toys, lampshades → estimate large boxes  
-- Extra-Large Boxes (6 cu ft): Comforters, pillows, sports equipment → estimate extra-large boxes
+- Small Boxes (1.5 cu ft each): Books, CDs, DVDs, kitchen gadgets → estimate number of small boxes needed
+- Medium Boxes (3 cu ft each): Clothing, towels, decorative items, small appliances → estimate medium boxes  
+- Large Boxes (4.5 cu ft each): Bedding, linens, larger toys, lampshades → estimate large boxes
+- Extra-Large Boxes (6 cu ft each): Comforters, pillows, sports equipment → estimate extra-large boxes
+
+CRITICAL: For box items, always report PER-BOX values:
+- volume: Use the standard box size (1.5, 3, 4.5, or 6 cu ft per box)
+- weight: Use estimated weight PER box (Small: 15-25 lbs, Medium: 20-30 lbs, Large: 25-35 lbs, Extra-Large: 30-40 lbs)
+- quantity: Number of boxes needed
 
 HIDDEN STORAGE ESTIMATION:
 You MUST also estimate boxes for contents that cannot be seen but would typically be stored in:
