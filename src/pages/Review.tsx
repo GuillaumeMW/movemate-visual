@@ -461,15 +461,19 @@ export default function Review() {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `inventory-report-${clientInfo.clientName.replace(/[^a-z0-9]/gi, '_')}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
+      // Get HTML content and open in new window for printing
+      const htmlContent = await response.text();
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
+        
+        // Wait for content to load, then trigger print
+        setTimeout(() => {
+          printWindow.print();
+          printWindow.close();
+        }, 1000);
+      }
 
       toast.success("PDF report generated and downloaded successfully!");
       setShowClientDialog(false);

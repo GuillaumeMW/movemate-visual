@@ -296,35 +296,11 @@ serve(async (req) => {
     </body>
     </html>`;
 
-    // Use Puppeteer to generate PDF
-    const puppeteer = (await import('https://deno.land/x/puppeteer@16.2.0/mod.ts')).default;
-    
-    const browser = await puppeteer.launch({
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
-    
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'networkidle0' });
-    
-    const pdfBuffer = await page.pdf({
-      format: 'A4',
-      margin: {
-        top: '20px',
-        right: '20px',
-        bottom: '20px',
-        left: '20px'
-      },
-      printBackground: true
-    });
-    
-    await browser.close();
-
-    // Return PDF as response
-    return new Response(pdfBuffer, {
+    // Return HTML that can be printed to PDF by the browser
+    return new Response(html, {
       headers: {
         ...corsHeaders,
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="inventory-report-${clientInfo.clientName.replace(/[^a-z0-9]/gi, '_')}.pdf"`
+        'Content-Type': 'text/html',
       },
     });
 
