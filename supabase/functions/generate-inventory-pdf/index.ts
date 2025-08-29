@@ -106,7 +106,7 @@ serve(async (req) => {
                 line-height: 1.4;
             }
             .header {
-                border-bottom: 2px solid #2563eb;
+                border-bottom: 2px solid #374151;
                 padding-bottom: 15px;
                 margin-bottom: 20px;
             }
@@ -119,7 +119,7 @@ serve(async (req) => {
             .company-name {
                 font-size: 24px;
                 font-weight: bold;
-                color: #2563eb;
+                color: #1f2937;
             }
             .report-date {
                 font-size: 12px;
@@ -133,7 +133,7 @@ serve(async (req) => {
             }
             .client-info h3 {
                 margin: 0 0 10px 0;
-                color: #2563eb;
+                color: #374151;
             }
             .summary {
                 display: grid;
@@ -150,7 +150,7 @@ serve(async (req) => {
             .summary-value {
                 font-size: 20px;
                 font-weight: bold;
-                color: #2563eb;
+                color: #1f2937;
             }
             .summary-label {
                 font-size: 12px;
@@ -162,7 +162,7 @@ serve(async (req) => {
                 page-break-inside: avoid;
             }
             .room-title {
-                background: #2563eb;
+                background: #374151;
                 color: white;
                 padding: 10px 15px;
                 margin: 0 0 10px 0;
@@ -324,7 +324,7 @@ serve(async (req) => {
 
         ${images.length > 0 ? `
         <div class="photo-gallery">
-            <h2 style="color: #2563eb; font-size: 18px; margin-bottom: 20px; border-bottom: 2px solid #2563eb; padding-bottom: 10px;">Photo Gallery</h2>
+            <h2 style="color: #1f2937; font-size: 18px; margin-bottom: 20px; border-bottom: 2px solid #374151; padding-bottom: 10px;">Photo Gallery</h2>
             <div class="photo-grid">
                 ${images.map((image, index) => `
                     <div class="photo-item">
