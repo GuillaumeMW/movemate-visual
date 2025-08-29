@@ -98,6 +98,19 @@ serve(async (req) => {
     <head>
         <meta charset="utf-8">
         <style>
+            @page {
+                size: letter portrait;
+                margin: 0.5in;
+            }
+            
+            @media print {
+                body {
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
+                    color-adjust: exact !important;
+                }
+            }
+            
             body {
                 font-family: Arial, sans-serif;
                 margin: 0;

@@ -463,6 +463,13 @@ export default function Review() {
 
       // Get HTML content and open in new window for printing
       const htmlContent = await response.text();
+      
+      // Show print settings recommendation
+      toast.success(
+        "Report ready! When printing, please use: Portrait layout, Letter paper size, Default margins, and enable Background graphics for best results.",
+        { duration: 5000 }
+      );
+      
       const printWindow = window.open('', '_blank');
       if (printWindow) {
         printWindow.document.write(htmlContent);
