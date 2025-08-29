@@ -81,7 +81,7 @@ export const RoomDropdown: React.FC<RoomDropdownProps> = ({ value, onValueChange
           )}
         </SelectValue>
       </SelectTrigger>
-      <SelectContent>
+      <SelectContent className="bg-background border border-border z-50 max-h-60 overflow-y-auto">
         {allRooms.map((room) => (
           <SelectItem key={room.name} value={room.name}>
             <div className={`px-2 py-1 rounded text-xs font-medium ${room.color}`}>

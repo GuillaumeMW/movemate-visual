@@ -806,7 +806,7 @@ export default function Review() {
 
 
 
-        {/* Image Preview Dialog */}
+         {/* Image Preview Dialog */}
         <Dialog open={selectedImage !== null} onOpenChange={closeImageGallery}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
             <DialogHeader>
@@ -876,13 +876,6 @@ export default function Review() {
             )}
           </DialogContent>
         </Dialog>
-
-        {/* Navigation */}
-        <div className="flex justify-end">
-          <Button variant="outline" onClick={() => navigate('/upload')}>
-            New Inventory
-          </Button>
-        </div>
       </div>
     </div>
   );
