@@ -211,6 +211,32 @@ serve(async (req) => {
             .page-break {
                 page-break-before: always;
             }
+            .photo-gallery {
+                page-break-before: always;
+                margin-top: 30px;
+            }
+            .photo-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 20px;
+                margin-bottom: 40px;
+            }
+            .photo-item {
+                text-align: center;
+                page-break-inside: avoid;
+            }
+            .photo-item img {
+                max-width: 100%;
+                max-height: 300px;
+                border: 1px solid #e2e8f0;
+                border-radius: 4px;
+            }
+            .photo-caption {
+                margin-top: 8px;
+                font-size: 12px;
+                color: #666;
+                font-weight: bold;
+            }
         </style>
     </head>
     <body>
@@ -255,6 +281,7 @@ serve(async (req) => {
                     <thead>
                         <tr>
                             <th>Item Name</th>
+                            <th>Photo #</th>
                             <th>Qty</th>
                             <th>Volume (cu ft)</th>
                             <th>Weight (lbs)</th>
@@ -266,6 +293,7 @@ serve(async (req) => {
                         ${roomItems.map(item => `
                             <tr>
                                 <td>${item.name}</td>
+                                <td>${item.found_in_image || 'N/A'}</td>
                                 <td>${item.quantity}</td>
                                 <td>${Number(item.volume).toFixed(2)}</td>
                                 <td>${Number(item.weight).toFixed(1)}</td>
@@ -293,6 +321,23 @@ serve(async (req) => {
         <div class="safety-note">
             <strong>Safety Factor Notice:</strong> A ${safetyFactorPercentage}% safety factor has been applied to all volume and weight calculations to account for packing efficiency and potential measurement variations.
         </div>
+
+        ${images.length > 0 ? `
+        <div class="photo-gallery">
+            <h2 style="color: #2563eb; font-size: 18px; margin-bottom: 20px; border-bottom: 2px solid #2563eb; padding-bottom: 10px;">Photo Gallery</h2>
+            <div class="photo-grid">
+                ${images.map((image, index) => `
+                    <div class="photo-item">
+                        <img src="${supabaseUrl}/storage/v1/object/public/inventory-images/${image.file_path}" alt="Inventory Photo ${index + 1}" />
+                        <div class="photo-caption">Photo #${index + 1}</div>
+                        <div style="font-size: 10px; color: #888; margin-top: 4px;">
+                            ${image.file_name} - ${new Date(image.analyzed_at).toLocaleDateString()}
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+        ` : ''}
     </body>
     </html>`;
 
