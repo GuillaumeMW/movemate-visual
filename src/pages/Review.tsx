@@ -84,8 +84,16 @@ export default function Review() {
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
   
-  // Safety factor state
-  const [safetyFactor, setSafetyFactor] = useState(0.2); // 20% default
+  // Safety factor state with localStorage persistence
+  const [safetyFactor, setSafetyFactor] = useState(() => {
+    const stored = localStorage.getItem('inventorySafetyFactor');
+    return stored ? parseFloat(stored) : 0.2;
+  });
+
+  // Persist safety factor to localStorage
+  useEffect(() => {
+    localStorage.setItem('inventorySafetyFactor', safetyFactor.toString());
+  }, [safetyFactor]);
   
   // Inline editing state
   const [editingItem, setEditingItem] = useState<string | null>(null);
