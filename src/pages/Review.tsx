@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Trash2, Edit3, Plus, Save, X, Image as ImageIcon, ChevronLeft, ChevronRight, Share2 } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Trash2, Edit3, Plus, Save, X, Image as ImageIcon, ChevronLeft, ChevronRight, Share2, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { RoomDropdown } from '@/components/RoomDropdown';
@@ -82,6 +83,9 @@ export default function Review() {
   const [selectedImageRoom, setSelectedImageRoom] = useState<string | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // Safety factor state
+  const [safetyFactor, setSafetyFactor] = useState(0.2); // 20% default
   
   // Inline editing state
   const [editingItem, setEditingItem] = useState<string | null>(null);
@@ -164,8 +168,11 @@ export default function Review() {
     is_going: true
   });
 
-  const totalVolume = items.reduce((sum, item) => sum + (item.volume * item.quantity), 0);
-  const totalWeight = items.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
+  // Apply safety factor to calculations
+  const applyLoadingSafetyFactor = (value: number) => value * (1 + safetyFactor);
+  
+  const totalVolume = applyLoadingSafetyFactor(items.reduce((sum, item) => sum + (item.volume * item.quantity), 0));
+  const totalWeight = applyLoadingSafetyFactor(items.reduce((sum, item) => sum + (item.weight * item.quantity), 0));
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
 
   const updateItem = async (id: string, updates: Partial<InventoryItem>) => {
@@ -423,6 +430,25 @@ export default function Review() {
           <div className="flex items-center justify-between h-16">
             <h1 className="text-xl font-semibold">Inventory Review</h1>
             <div className="flex items-center gap-3">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Settings className="h-4 w-4 mr-2" />
+                    SF: {safetyFactor >= 0 ? '+' : ''}{(safetyFactor * 100).toFixed(0)}%
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="bg-background border border-border z-50">
+                  {[-0.1, 0, 0.1, 0.2, 0.3, 0.4].map((factor) => (
+                    <DropdownMenuItem
+                      key={factor}
+                      onClick={() => setSafetyFactor(factor)}
+                      className={safetyFactor === factor ? "bg-accent" : ""}
+                    >
+                      {factor >= 0 ? '+' : ''}{(factor * 100).toFixed(0)}% Safety Factor
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button variant="outline" onClick={() => navigate('/upload')}>
                 New Inventory
               </Button>
