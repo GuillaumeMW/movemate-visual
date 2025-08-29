@@ -237,6 +237,9 @@ serve(async (req) => {
             .photo-item {
                 text-align: center;
                 page-break-inside: avoid;
+                break-inside: avoid;
+                display: block;
+                margin-bottom: 20px;
             }
             .photo-item img {
                 max-width: 100%;
