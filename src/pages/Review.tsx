@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Trash2, Edit3, Plus, Save, X, Image as ImageIcon, ChevronLeft, ChevronRight, Share } from 'lucide-react';
+import { Trash2, Edit3, Plus, Save, X, Image as ImageIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { RoomDropdown } from '@/components/RoomDropdown';
@@ -86,9 +86,6 @@ export default function Review() {
   // Inline editing state
   const [editingItem, setEditingItem] = useState<string | null>(null);
   const [editingValues, setEditingValues] = useState<Partial<InventoryItem>>({});
-  const [showAddRoomDialog, setShowAddRoomDialog] = useState(false);
-  const [newRoomName, setNewRoomName] = useState('');
-  const [addRoomMode, setAddRoomMode] = useState<'manual' | 'photo' | null>(null);
 
   // Load inventory items from database
   useEffect(() => {
@@ -167,10 +164,9 @@ export default function Review() {
     is_going: true
   });
 
-  const goingItems = items.filter(item => item.is_going !== false);
-  const totalVolume = goingItems.reduce((sum, item) => sum + (item.volume * item.quantity), 0);
-  const totalWeight = goingItems.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
-  const totalItems = goingItems.reduce((sum, item) => sum + item.quantity, 0);
+  const totalVolume = items.reduce((sum, item) => sum + (item.volume * item.quantity), 0);
+  const totalWeight = items.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
+  const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
 
   const updateItem = async (id: string, updates: Partial<InventoryItem>) => {
     try {
@@ -224,45 +220,6 @@ export default function Review() {
   const cancelEditing = () => {
     setEditingItem(null);
     setEditingValues({});
-  };
-
-  const openAddRoomDialog = () => {
-    setShowAddRoomDialog(true);
-    setAddRoomMode(null);
-    setNewRoomName('');
-  };
-
-  const closeAddRoomDialog = () => {
-    setShowAddRoomDialog(false);
-    setAddRoomMode(null);
-    setNewRoomName('');
-  };
-
-  const handleAddRoomManual = () => {
-    if (!newRoomName.trim()) {
-      toast.error('Please enter a room name');
-      return;
-    }
-    setActiveAddFormRoom(newRoomName.trim());
-    setNewItem({
-      name: '',
-      quantity: 1,
-      volume: 0,
-      weight: 0,
-      room: newRoomName.trim(),
-      is_going: true
-    });
-    closeAddRoomDialog();
-  };
-
-  const handleAddRoomPhoto = () => {
-    if (!newRoomName.trim()) {
-      toast.error('Please enter a room name');
-      return;
-    }
-    // Store the room name and navigate to upload with room context
-    localStorage.setItem('pendingRoomName', newRoomName.trim());
-    navigate(sessionId ? `/upload?session=${sessionId}&room=${encodeURIComponent(newRoomName.trim())}` : `/upload?room=${encodeURIComponent(newRoomName.trim())}`);
   };
 
   const deleteItem = async (id: string) => {
@@ -373,13 +330,12 @@ export default function Review() {
     try {
       const { data: currentItems } = await supabase
         .from('inventory_items')
-        .select('volume, weight, quantity, is_going')
+        .select('volume, weight, quantity')
         .eq('session_id', sessionId);
 
       if (currentItems) {
-        const goingItems = currentItems.filter(item => item.is_going !== false);
-        const totalVolume = goingItems.reduce((sum, item) => sum + (item.volume * item.quantity), 0);
-        const totalWeight = goingItems.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
+        const totalVolume = currentItems.reduce((sum, item) => sum + (item.volume * item.quantity), 0);
+        const totalWeight = currentItems.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
 
         await supabase
           .from('inventory_sessions')
@@ -461,36 +417,11 @@ export default function Review() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Sticky Top Navigation */}
-      <div className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container mx-auto px-4 py-3 max-w-6xl">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-xl font-bold">Review Your Inventory</h1>
-              <p className="text-sm text-muted-foreground">
-                {totalItems} items • {totalVolume.toFixed(1)} cu ft • {totalWeight.toFixed(0)} lbs
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={() => navigate('/upload')}>
-                New Inventory
-              </Button>
-              <Button variant="outline">
-                <Share className="h-4 w-4 mr-2" />
-                Share
-              </Button>
-              <Button onClick={() => navigate('/finalize')}>
-                Finalize Report
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <div className="container mx-auto px-4 py-8 max-w-6xl">
         <div className="mb-8">
+          <h1 className="text-3xl font-bold mb-2">Review Your Inventory</h1>
           <p className="text-muted-foreground">
-            Review and edit the items we detected. Don't forget to add boxes.
+            Review and edit the items we detected. Click on any field to edit it.
           </p>
         </div>
 
@@ -548,8 +479,12 @@ export default function Review() {
 
         {/* Items by Room */}
         <div className="mb-8">
-          <div className="mb-6">
+          <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold">Inventory Items by Room</h2>
+            <Button onClick={() => {}}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Room
+            </Button>
           </div>
 
           {(() => {
@@ -572,9 +507,8 @@ export default function Review() {
 
             return Object.entries(roomGroups).map(([room, roomItems]) => {
               const roomPhotos = getRoomPhotos(roomItems);
-              const goingRoomItems = roomItems.filter(item => item.is_going !== false);
-              const roomVolume = goingRoomItems.reduce((sum, item) => sum + (item.volume * item.quantity), 0);
-              const roomWeight = goingRoomItems.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
+              const roomVolume = roomItems.reduce((sum, item) => sum + (item.volume * item.quantity), 0);
+              const roomWeight = roomItems.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
 
               return (
                 <Card key={room} className="mb-6">
@@ -855,98 +789,6 @@ export default function Review() {
 
 
 
-        {/* Add Room Dialog */}
-        <Dialog open={showAddRoomDialog} onOpenChange={closeAddRoomDialog}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Add New Room</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-6">
-              {!addRoomMode ? (
-                <div className="space-y-4">
-                  <p className="text-sm text-muted-foreground">
-                    How would you like to add items to the new room?
-                  </p>
-                  <div className="grid grid-cols-1 gap-3">
-                    <Button 
-                      variant="outline" 
-                      className="h-20 flex-col gap-2"
-                      onClick={() => setAddRoomMode('manual')}
-                    >
-                      <Edit3 className="h-6 w-6" />
-                      <div className="text-center">
-                        <div className="font-medium">Manual Entry</div>
-                        <div className="text-xs text-muted-foreground">Add items manually</div>
-                      </div>
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      className="h-20 flex-col gap-2"
-                      onClick={() => setAddRoomMode('photo')}
-                    >
-                      <ImageIcon className="h-6 w-6" />
-                      <div className="text-center">
-                        <div className="font-medium">Upload Photos</div>
-                        <div className="text-xs text-muted-foreground">Analyze photos with AI</div>
-                      </div>
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => setAddRoomMode(null)}
-                    className="self-start p-0 h-auto"
-                  >
-                    ← Back
-                  </Button>
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">Room Name *</label>
-                    <Input
-                      value={newRoomName}
-                      onChange={(e) => setNewRoomName(e.target.value)}
-                      placeholder="e.g., Master Bedroom, Kitchen, Garage"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          if (addRoomMode === 'manual') {
-                            handleAddRoomManual();
-                          } else {
-                            handleAddRoomPhoto();
-                          }
-                        }
-                      }}
-                      autoFocus
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <Button 
-                      onClick={addRoomMode === 'manual' ? handleAddRoomManual : handleAddRoomPhoto}
-                      className="flex-1"
-                    >
-                      {addRoomMode === 'manual' ? (
-                        <>
-                          <Plus className="h-4 w-4 mr-2" />
-                          Create Room
-                        </>
-                      ) : (
-                        <>
-                          <ImageIcon className="h-4 w-4 mr-2" />
-                          Upload Photos
-                        </>
-                      )}
-                    </Button>
-                    <Button variant="outline" onClick={closeAddRoomDialog}>
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
-
         {/* Image Preview Dialog */}
         <Dialog open={selectedImage !== null} onOpenChange={closeImageGallery}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
@@ -1018,10 +860,18 @@ export default function Review() {
           </DialogContent>
         </Dialog>
 
-        {/* Bottom Navigation */}
-        <div className="flex justify-center">
-          <Button variant="outline" onClick={() => navigate(sessionId ? `/upload?session=${sessionId}` : '/upload')}>
-            Upload More Photos
+        {/* Navigation */}
+        <div className="flex justify-between">
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => navigate(sessionId ? `/upload?session=${sessionId}` : '/upload')}>
+              Upload More Photos
+            </Button>
+            <Button variant="outline" onClick={() => navigate('/upload')}>
+              New Inventory
+            </Button>
+          </div>
+          <Button onClick={() => navigate('/finalize')}>
+            Finalize Report
           </Button>
         </div>
       </div>

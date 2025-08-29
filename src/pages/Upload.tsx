@@ -24,7 +24,6 @@ const UploadPage = () => {
   const [analysisProgress, setAnalysisProgress] = useState({ current: 0, total: 0 });
   const [currentSession, setCurrentSession] = useState<any>(null);
   const [searchParams] = useSearchParams();
-  const [predefinedRoom, setPredefinedRoom] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   
@@ -37,14 +36,8 @@ const UploadPage = () => {
 
   useEffect(() => {
     const sessionId = searchParams.get('session');
-    const roomParam = searchParams.get('room');
-    
     if (sessionId) {
       loadExistingSession(sessionId);
-    }
-    
-    if (roomParam) {
-      setPredefinedRoom(decodeURIComponent(roomParam));
     }
   }, [searchParams]);
 
@@ -188,24 +181,10 @@ const UploadPage = () => {
         session = newSession;
       }
 
-      // Get the highest existing image number first to continue numbering
-      const { data: existingImages, error: existingError } = await supabase
-        .from('inventory_items')
-        .select('found_in_image')
-        .eq('session_id', session.id)
-        .not('found_in_image', 'is', null);
-      
-      let startingImageNumber = 1;
-      if (!existingError && existingImages && existingImages.length > 0) {
-        const maxImageNumber = Math.max(...existingImages.map(item => item.found_in_image || 0));
-        startingImageNumber = maxImageNumber + 1;
-      }
-
       // Upload files to Supabase Storage and track them
       const uploadPromises = files.map(async (file, index) => {
         const fileExt = file.file.name.split('.').pop();
-        const imageNumber = startingImageNumber + index;
-        const fileName = `${session.id}_${imageNumber}_${Date.now()}.${fileExt}`;
+        const fileName = `${session.id}_${index + 1}_${Date.now()}.${fileExt}`;
         
         const { error: uploadError } = await supabase.storage
           .from('inventory-images')
@@ -227,67 +206,38 @@ const UploadPage = () => {
 
       const uploadedFiles = await Promise.all(uploadPromises);
       
-      // TWO-PASS ANALYSIS SYSTEM (or single room assignment if predefined room)
+      // TWO-PASS ANALYSIS SYSTEM
       
-      let roomMappings: Record<number, string> = {};
-      let detectedRooms: string[] = [];
+      // PASS 1: Room Detection
+      setCurrentStep('room-detection');
+      toast.info("Step 1: Detecting rooms across all images...", { duration: 3000 });
       
-      if (predefinedRoom) {
-        // If we have a predefined room, assign all images to that room
-        setCurrentStep('room-assignment');
-        toast.info(`Assigning all photos to room: ${predefinedRoom}...`, { duration: 2000 });
-        
-        for (let i = 0; i < files.length; i++) {
-          roomMappings[startingImageNumber + i] = predefinedRoom;
+      const allBase64Images = await Promise.all(
+        files.map(file => convertFileToBase64(file.file))
+      );
+      
+      const { data: roomData, error: roomError } = await supabase.functions.invoke('analyze-inventory', {
+        body: { 
+          mode: 'room-detection',
+          images: allBase64Images
         }
-        detectedRooms = [predefinedRoom];
-        setRoomsDetected([predefinedRoom]);
-        toast.success(`✓ All photos assigned to: ${predefinedRoom}`, { duration: 3000 });
-      } else {
-        // PASS 1: Room Detection (original logic)
-        setCurrentStep('room-detection');
-        toast.info("Step 1: Detecting rooms across all images...", { duration: 3000 });
-        
-        const allBase64Images = await Promise.all(
-          files.map(file => convertFileToBase64(file.file))
-        );
-        
-        const { data: roomData, error: roomError } = await supabase.functions.invoke('analyze-inventory', {
-          body: { 
-            mode: 'room-detection',
-            images: allBase64Images
-          }
-        });
+      });
 
-        if (roomError) {
-          console.error('Room detection error:', roomError);
-          toast.error('Failed to detect rooms. Using default room assignment.');
-        }
-
-        roomMappings = roomData?.image_room_mapping || {};
-        detectedRooms = roomData?.rooms_detected || [];
-        
-        // Adjust room mappings to use actual image numbers instead of file indices
-        if (Object.keys(roomMappings).length > 0) {
-          const adjustedRoomMappings: Record<number, string> = {};
-          
-          Object.keys(roomMappings).forEach((key) => {
-            const fileIndex = parseInt(key);
-            const actualImageNumber = startingImageNumber + fileIndex - 1;
-            adjustedRoomMappings[actualImageNumber] = roomMappings[fileIndex];
-          });
-          
-          roomMappings = adjustedRoomMappings;
-        }
-        
-        console.log('Room detection results:', { roomMappings, detectedRooms });
-        setRoomsDetected(detectedRooms);
-        toast.success(`✓ Detected ${detectedRooms.length} rooms: ${detectedRooms.join(', ')}`, { duration: 4000 });
+      if (roomError) {
+        console.error('Room detection error:', roomError);
+        toast.error('Failed to detect rooms. Using default room assignment.');
       }
+
+      const roomMappings = roomData?.image_room_mapping || {};
+      const detectedRooms = roomData?.rooms_detected || [];
+      
+      console.log('Room detection results:', { roomMappings, detectedRooms });
+      setRoomsDetected(detectedRooms);
+      toast.success(`✓ Detected ${detectedRooms.length} rooms: ${detectedRooms.join(', ')}`, { duration: 4000 });
       
       // PASS 2: Item Analysis with Room Context
       setCurrentStep('item-analysis');
-      toast.info(`${predefinedRoom ? 'Analyzing items in' : 'Step 2: Analyzing items with room context in'} ${predefinedRoom || 'detected rooms'}...`, { duration: 2000 });
+      toast.info("Step 2: Analyzing items with room context...", { duration: 2000 });
       setAnalysisProgress({ current: 0, total: files.length });
       let allItems: any[] = [];
       
@@ -296,12 +246,11 @@ const UploadPage = () => {
         setAnalysisProgress({ current: i + 1, total: files.length });
         setCurrentImage(i + 1);
         
-        // Get room for this image (use the correct image number for room mapping)
-        const currentImageNumber = startingImageNumber + i;
-        const imageRoom = roomMappings[currentImageNumber] || 'unknown room';
+        // Get room for this image
+        const imageRoom = roomMappings[i + 1] || 'unknown room';
         setCurrentRoom(imageRoom);
         
-        toast.info(`Analyzing image ${currentImageNumber} of ${startingImageNumber + files.length - 1}...`, { 
+        toast.info(`Analyzing image ${i + 1} of ${files.length}...`, { 
           duration: 1000,
           id: 'analysis-progress'
         });
@@ -315,31 +264,31 @@ const UploadPage = () => {
             body: { 
               mode: 'item-analysis',
               image: base64Image,
-              imageNumber: currentImageNumber,
+              imageNumber: i + 1,
               existingItems: allItems,
               roomMappings: roomMappings
             }
           });
 
           if (error) {
-            console.error(`Error analyzing image ${currentImageNumber}:`, error);
-            toast.error(`Failed to analyze image ${currentImageNumber}`);
+            console.error(`Error analyzing image ${i + 1}:`, error);
+            toast.error(`Failed to analyze image ${i + 1}`);
             continue;
           }
 
           if (data.items && data.items.length > 0) {
             allItems.push(...data.items);
             setItemsFound(data.items.length);
-            toast.success(`✓ Found ${data.items.length} items in image ${currentImageNumber}`, { 
+            toast.success(`✓ Found ${data.items.length} items in image ${i + 1}`, { 
               duration: 2000 
             });
           } else {
             setItemsFound(0);
-            toast.info(`No items found in image ${currentImageNumber}`, { duration: 1500 });
+            toast.info(`No items found in image ${i + 1}`, { duration: 1500 });
           }
         } catch (imageError) {
-          console.error(`Error processing image ${currentImageNumber}:`, imageError);
-          toast.error(`Failed to process image ${currentImageNumber}`);
+          console.error(`Error processing image ${i + 1}:`, imageError);
+          toast.error(`Failed to process image ${i + 1}`);
         }
       }
 
@@ -442,32 +391,20 @@ const UploadPage = () => {
 
           <div className="max-w-4xl mx-auto">
             {/* Session Info */}
-            {(currentSession || predefinedRoom) && (
+            {currentSession && (
               <div className="mb-6 p-4 bg-primary/10 border border-primary/20 rounded-lg">
                 <div className="flex items-center justify-between">
                   <div>
-                    {currentSession && (
-                      <>
-                        <h3 className="font-semibold text-primary">Continuing Session</h3>
-                        <p className="text-sm text-muted-foreground">{currentSession.name}</p>
-                      </>
-                    )}
-                    {predefinedRoom && (
-                      <>
-                        <h3 className="font-semibold text-primary">Adding to Room: {predefinedRoom}</h3>
-                        <p className="text-sm text-muted-foreground">All photos will be analyzed for this room</p>
-                      </>
-                    )}
+                    <h3 className="font-semibold text-primary">Continuing Session</h3>
+                    <p className="text-sm text-muted-foreground">{currentSession.name}</p>
                   </div>
-                  {currentSession && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate(`/review?session=${currentSession.id}`)}
-                    >
-                      View Existing Items
-                    </Button>
-                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate(`/review?session=${currentSession.id}`)}
+                  >
+                    View Existing Items
+                  </Button>
                 </div>
               </div>
             )}
