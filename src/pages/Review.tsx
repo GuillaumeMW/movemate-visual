@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Trash2, Edit3, Plus, Save, X, Image as ImageIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Trash2, Edit3, Plus, Save, X, Image as ImageIcon, ChevronLeft, ChevronRight, Share2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { RoomDropdown } from '@/components/RoomDropdown';
@@ -417,6 +417,27 @@ export default function Review() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Sticky Navigation Bar */}
+      <div className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
+        <div className="container mx-auto px-4">
+          <div className="flex items-center justify-between h-16">
+            <h1 className="text-xl font-semibold">Inventory Review</h1>
+            <div className="flex items-center gap-3">
+              <Button variant="outline" onClick={() => navigate('/upload')}>
+                New Inventory
+              </Button>
+              <Button variant="outline" onClick={() => {}}>
+                <Share2 className="h-4 w-4 mr-2" />
+                Share
+              </Button>
+              <Button onClick={() => navigate('/finalize')}>
+                Finalize Report
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+      
       <div className="container mx-auto px-4 py-8 max-w-6xl">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Review Your Inventory</h1>
@@ -481,10 +502,6 @@ export default function Review() {
         <div className="mb-8">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold">Inventory Items by Room</h2>
-            <Button onClick={() => {}}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Room
-            </Button>
           </div>
 
           {(() => {
@@ -861,17 +878,9 @@ export default function Review() {
         </Dialog>
 
         {/* Navigation */}
-        <div className="flex justify-between">
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => navigate(sessionId ? `/upload?session=${sessionId}` : '/upload')}>
-              Upload More Photos
-            </Button>
-            <Button variant="outline" onClick={() => navigate('/upload')}>
-              New Inventory
-            </Button>
-          </div>
-          <Button onClick={() => navigate('/finalize')}>
-            Finalize Report
+        <div className="flex justify-end">
+          <Button variant="outline" onClick={() => navigate('/upload')}>
+            New Inventory
           </Button>
         </div>
       </div>
