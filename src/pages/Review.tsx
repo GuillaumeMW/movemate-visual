@@ -85,16 +85,8 @@ export default function Review() {
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
   
-  // Safety factor state with localStorage persistence
-  const [safetyFactor, setSafetyFactor] = useState(() => {
-    const stored = localStorage.getItem('inventorySafetyFactor');
-    return stored ? parseFloat(stored) : 0.2;
-  });
-
-  // Persist safety factor to localStorage
-  useEffect(() => {
-    localStorage.setItem('inventorySafetyFactor', safetyFactor.toString());
-  }, [safetyFactor]);
+  // Safety factor state
+  const [safetyFactor, setSafetyFactor] = useState(0.2);
   
   // Inline editing state
   const [editingItem, setEditingItem] = useState<string | null>(null);
@@ -150,6 +142,8 @@ export default function Review() {
         if (imagesResult.error) throw imagesResult.error;
 
         setSessionInfo(sessionResult.data);
+        // Load safety factor from session data or use default
+        setSafetyFactor(sessionResult.data?.safety_factor ?? 0.2);
         setItems(itemsResult.data || []);
         
         // Sort uploaded images by the image number in file path
@@ -343,7 +337,7 @@ export default function Review() {
   };
 
 
-  // Helper function to update session totals
+  // Helper function to update session totals and safety factor
   const updateSessionTotals = async () => {
     if (!sessionId) return;
     
@@ -361,12 +355,32 @@ export default function Review() {
           .from('inventory_sessions')
           .update({
             total_volume: totalVolume,
-            total_weight: totalWeight
+            total_weight: totalWeight,
+            safety_factor: safetyFactor
           })
           .eq('id', sessionId);
       }
     } catch (error) {
       console.error('Error updating session totals:', error);
+    }
+  };
+
+  // Function to update safety factor in database
+  const updateSafetyFactor = async (newSafetyFactor: number) => {
+    setSafetyFactor(newSafetyFactor);
+    
+    if (sessionId) {
+      try {
+        await supabase
+          .from('inventory_sessions')
+          .update({
+            safety_factor: newSafetyFactor
+          })
+          .eq('id', sessionId);
+      } catch (error) {
+        console.error('Error updating safety factor:', error);
+        toast.error('Failed to save safety factor');
+      }
     }
   };
 
@@ -505,25 +519,6 @@ export default function Review() {
           <div className="flex items-center justify-between h-16">
             <h1 className="text-xl font-semibold">Inventory Review</h1>
             <div className="flex items-center gap-3">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    <Settings className="h-4 w-4 mr-2" />
-                    SF: {safetyFactor >= 0 ? '+' : ''}{(safetyFactor * 100).toFixed(0)}%
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="bg-background border border-border z-50">
-                  {[-0.1, 0, 0.1, 0.2, 0.3, 0.4].map((factor) => (
-                    <DropdownMenuItem
-                      key={factor}
-                      onClick={() => setSafetyFactor(factor)}
-                      className={safetyFactor === factor ? "bg-accent" : ""}
-                    >
-                      {factor >= 0 ? '+' : ''}{(factor * 100).toFixed(0)}% Safety Factor
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
               <Button variant="outline" onClick={() => navigate('/upload')}>
                 New Inventory
               </Button>
@@ -541,7 +536,28 @@ export default function Review() {
       
       <div className="container mx-auto px-4 py-8 max-w-6xl">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Review Your Inventory</h1>
+          <div className="flex items-center justify-between mb-2">
+            <h1 className="text-3xl font-bold">Review Your Inventory</h1>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Settings className="h-4 w-4 mr-2" />
+                  SF: {safetyFactor >= 0 ? '+' : ''}{(safetyFactor * 100).toFixed(0)}%
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-background border border-border z-50">
+                {[-0.1, 0, 0.1, 0.2, 0.3, 0.4].map((factor) => (
+                  <DropdownMenuItem
+                    key={factor}
+                    onClick={() => updateSafetyFactor(factor)}
+                    className={safetyFactor === factor ? "bg-accent" : ""}
+                  >
+                    {factor >= 0 ? '+' : ''}{(factor * 100).toFixed(0)}% Safety Factor
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
           <p className="text-muted-foreground">
             Review and edit the items we detected. Click on any field to edit it.
           </p>

@@ -72,6 +72,7 @@ export type Database = {
           created_at: string
           id: string
           name: string | null
+          safety_factor: number | null
           status: string | null
           total_volume: number | null
           total_weight: number | null
@@ -81,6 +82,7 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string | null
+          safety_factor?: number | null
           status?: string | null
           total_volume?: number | null
           total_weight?: number | null
@@ -90,6 +92,7 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string | null
+          safety_factor?: number | null
           status?: string | null
           total_volume?: number | null
           total_weight?: number | null
