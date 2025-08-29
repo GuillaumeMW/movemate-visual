@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import Start from "./pages/Start";
 import Upload from "./pages/Upload";
 import Review from "./pages/Review";
+import SharedInventory from "./pages/SharedInventory";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -23,6 +24,7 @@ const App = () => (
           <Route path="/start" element={<Start />} />
           <Route path="/upload" element={<Upload />} />
           <Route path="/review" element={<Review />} />
+          <Route path="/shared/:token" element={<SharedInventory />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

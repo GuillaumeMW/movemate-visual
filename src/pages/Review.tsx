@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { RoomDropdown } from '@/components/RoomDropdown';
 import { ClientInfoDialog } from '@/components/ClientInfoDialog';
+import { ShareDialog } from '@/components/ShareDialog';
 
 interface InventoryItem {
   id: string;
@@ -95,6 +96,7 @@ export default function Review() {
   // PDF generation state
   const [showClientDialog, setShowClientDialog] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [showShareDialog, setShowShareDialog] = useState(false);
 
   // Load inventory items from database
   useEffect(() => {
@@ -522,7 +524,11 @@ export default function Review() {
               <Button variant="outline" onClick={() => navigate('/upload')}>
                 New Inventory
               </Button>
-              <Button variant="outline" onClick={() => {}}>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setShowShareDialog(true)}
+              >
                 <Share2 className="h-4 w-4 mr-2" />
                 Share
               </Button>
@@ -995,12 +1001,18 @@ export default function Review() {
         </Dialog>
 
         {/* Client Info Dialog */}
-        <ClientInfoDialog
-          isOpen={showClientDialog}
-          onClose={() => setShowClientDialog(false)}
-          onSubmit={handleGeneratePdf}
-          isGenerating={isGeneratingPdf}
-        />
+      <ClientInfoDialog
+        isOpen={showClientDialog}
+        onClose={() => setShowClientDialog(false)}
+        onSubmit={handleGeneratePdf}
+        isGenerating={isGeneratingPdf}
+      />
+
+      <ShareDialog
+        isOpen={showShareDialog}
+        onClose={() => setShowShareDialog(false)}
+        sessionId={sessionId || ""}
+      />
       </div>
     </div>
   );

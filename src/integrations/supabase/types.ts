@@ -14,6 +14,62 @@ export type Database = {
   }
   public: {
     Tables: {
+      inventory_access_tokens: {
+        Row: {
+          access_count: number | null
+          access_level: string
+          created_at: string
+          created_by_email: string | null
+          created_by_name: string | null
+          id: string
+          is_active: boolean | null
+          last_accessed_at: string | null
+          notes: string | null
+          recipient_email: string | null
+          recipient_name: string | null
+          session_id: string
+          token: string
+        }
+        Insert: {
+          access_count?: number | null
+          access_level: string
+          created_at?: string
+          created_by_email?: string | null
+          created_by_name?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_accessed_at?: string | null
+          notes?: string | null
+          recipient_email?: string | null
+          recipient_name?: string | null
+          session_id: string
+          token?: string
+        }
+        Update: {
+          access_count?: number | null
+          access_level?: string
+          created_at?: string
+          created_by_email?: string | null
+          created_by_name?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_accessed_at?: string | null
+          notes?: string | null
+          recipient_email?: string | null
+          recipient_name?: string | null
+          session_id?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_access_tokens_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory_items: {
         Row: {
           ai_generated: boolean | null
@@ -69,30 +125,42 @@ export type Database = {
       }
       inventory_sessions: {
         Row: {
+          access_mode: string | null
           created_at: string
           id: string
           name: string | null
           safety_factor: number | null
+          shared_at: string | null
+          shared_by_email: string | null
+          shared_by_name: string | null
           status: string | null
           total_volume: number | null
           total_weight: number | null
           updated_at: string
         }
         Insert: {
+          access_mode?: string | null
           created_at?: string
           id?: string
           name?: string | null
           safety_factor?: number | null
+          shared_at?: string | null
+          shared_by_email?: string | null
+          shared_by_name?: string | null
           status?: string | null
           total_volume?: number | null
           total_weight?: number | null
           updated_at?: string
         }
         Update: {
+          access_mode?: string | null
           created_at?: string
           id?: string
           name?: string | null
           safety_factor?: number | null
+          shared_at?: string | null
+          shared_by_email?: string | null
+          shared_by_name?: string | null
           status?: string | null
           total_volume?: number | null
           total_weight?: number | null
