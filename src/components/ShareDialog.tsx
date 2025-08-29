@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -74,7 +74,7 @@ export function ShareDialog({ isOpen, onClose, sessionId }: ShareDialogProps) {
     },
   });
 
-  const loadExistingTokens = React.useCallback(async () => {
+  const loadExistingTokens = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from("inventory_access_tokens")
@@ -90,7 +90,7 @@ export function ShareDialog({ isOpen, onClose, sessionId }: ShareDialogProps) {
     }
   }, [sessionId]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (isOpen) {
       loadExistingTokens();
     }
