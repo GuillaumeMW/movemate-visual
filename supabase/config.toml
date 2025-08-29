@@ -1,1 +1,4 @@
 project_id = "ahtqiuhimddklgkrevzi"
+
+[functions.generate-inventory-pdf]
+verify_jwt = false

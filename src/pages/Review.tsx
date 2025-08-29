@@ -11,6 +11,7 @@ import { Trash2, Edit3, Plus, Save, X, Image as ImageIcon, ChevronLeft, ChevronR
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { RoomDropdown } from '@/components/RoomDropdown';
+import { ClientInfoDialog } from '@/components/ClientInfoDialog';
 
 interface InventoryItem {
   id: string;
@@ -98,6 +99,10 @@ export default function Review() {
   // Inline editing state
   const [editingItem, setEditingItem] = useState<string | null>(null);
   const [editingValues, setEditingValues] = useState<Partial<InventoryItem>>({});
+  
+  // PDF generation state
+  const [showClientDialog, setShowClientDialog] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   // Load inventory items from database
   useEffect(() => {
@@ -429,6 +434,57 @@ export default function Review() {
     }
   }, [selectedImage, currentImageIndex, selectedImageRoom]);
 
+  // Handle PDF generation
+  const handleGeneratePdf = async (clientInfo: { clientName: string; city: string; quoteId?: string }) => {
+    if (!sessionId) {
+      toast.error("No session found. Please upload images first.");
+      return;
+    }
+
+    setIsGeneratingPdf(true);
+    
+    try {
+      const response = await fetch(`https://ahtqiuhimddklgkrevzi.supabase.co/functions/v1/generate-inventory-pdf`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFodHFpdWhpbWRka2xna3JldnppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1Njc5ODMsImV4cCI6MjA3MTE0Mzk4M30.asYR6zp7-6nbBopx3dspFjQnHOYrQ9Jd7mpeS_t5RY0`
+        },
+        body: JSON.stringify({
+          sessionId,
+          clientInfo,
+          safetyFactor
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `inventory-report-${clientInfo.clientName.replace(/[^a-z0-9]/gi, '_')}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast.success("PDF report generated and downloaded successfully!");
+      setShowClientDialog(false);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast.error("Failed to generate PDF report. Please try again.");
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
+  const handleFinalizeClick = () => {
+    setShowClientDialog(true);
+  };
+
 
   return (
     <div className="min-h-screen bg-background">
@@ -464,7 +520,7 @@ export default function Review() {
                 <Share2 className="h-4 w-4 mr-2" />
                 Share
               </Button>
-              <Button onClick={() => navigate('/finalize')}>
+              <Button onClick={handleFinalizeClick}>
                 Finalize Report
               </Button>
             </div>
@@ -910,6 +966,14 @@ export default function Review() {
             )}
           </DialogContent>
         </Dialog>
+
+        {/* Client Info Dialog */}
+        <ClientInfoDialog
+          isOpen={showClientDialog}
+          onClose={() => setShowClientDialog(false)}
+          onSubmit={handleGeneratePdf}
+          isGenerating={isGeneratingPdf}
+        />
       </div>
     </div>
   );
