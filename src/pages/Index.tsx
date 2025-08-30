@@ -89,21 +89,21 @@ const Index = () => {
             </p>
             <Button variant="outline" className="w-full">Best for Most</Button>
           </div>
-          <div className="border rounded-lg p-6 text-center hover:shadow-md transition-shadow">
-            <Upload className="w-12 h-12 mx-auto mb-4 text-primary" />
+          <div className="border rounded-lg p-6 text-center hover:shadow-md transition-shadow opacity-60">
+            <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
             <h3 className="text-xl font-semibold mb-2">Upload Video</h3>
             <p className="text-muted-foreground mb-4">
               Record a walkthrough video. Perfect for getting everything in one go.
             </p>
-            <Button variant="outline" className="w-full">Quick & Easy</Button>
+            <Button variant="outline" className="w-full" disabled>Coming Soon</Button>
           </div>
-          <div className="border rounded-lg p-6 text-center hover:shadow-md transition-shadow">
-            <FileText className="w-12 h-12 mx-auto mb-4 text-primary" />
+          <div className="border rounded-lg p-6 text-center hover:shadow-md transition-shadow opacity-60">
+            <FileText className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
             <h3 className="text-xl font-semibold mb-2">Manual List</h3>
             <p className="text-muted-foreground mb-4">
               Type in your items manually. Great for those who prefer control.
             </p>
-            <Button variant="outline" className="w-full">Full Control</Button>
+            <Button variant="outline" className="w-full" disabled>Coming Soon</Button>
           </div>
         </div>
       </div>
